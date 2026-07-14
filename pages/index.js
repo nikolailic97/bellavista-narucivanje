@@ -18,51 +18,76 @@ import {
   vremeUMilisekundama,
 } from "../lib/pomocne";
 
+// ============ TODO: ZAMENI KAD DOBIJEMO FINALNI NAZIV/LOGO ============
+const NAZIV_RESTORANA = "Restoran"; // koristi se u title/meta/JSON-LD, logo slika ide preko /images/logo.png
+const INSTAGRAM_URL = "https://instagram.com/"; // TODO: zameni pravim profilom
+const SAJT_ILICODE = "https://ilicodes.com";
+const PRAG_BESPLATNE_DOSTAVE = 1600;
+const CENA_DOSTAVE = 200;
+
 // ============ STATIČNI PODACI (jelovnik se ne čuva u Firestore-u) ============
+const KATEGORIJE = [
+  { id: "burgeri", sr: "Burgeri", en: "Burgers" },
+  { id: "pice", sr: "Pice", en: "Pizzas" },
+  { id: "salate", sr: "Salate", en: "Salads" },
+  { id: "deserti", sr: "Deserti", en: "Desserts" },
+];
+
 const JELOVNIK = [
   {
     id: "1",
-    naziv: "Gurmanska pljeskavica",
-    opis: "Kačkavalj, slaninica, tucana paprika, luk...",
+    naziv: { sr: "Gurmanska pljeskavica", en: "Gourmet Burger" },
+    opis: {
+      sr: "Kačkavalj, slaninica, tucana paprika, luk...",
+      en: "Cheese, bacon, roasted peppers, onion...",
+    },
     cena: 450,
-    kategorija: "Burgers",
+    kategorija: "burgeri",
     vreme_pripreme: 15,
-    slika_url: "/images/pljeskavica.webp",
+    slika_url: "/images/pljeskavica.jpg",
   },
   {
     id: "2",
-    naziv: "Margarita Pica",
-    opis: "Pelat, kačkavalj, masline, origano...",
+    naziv: { sr: "Margarita Pica", en: "Margherita Pizza" },
+    opis: {
+      sr: "Pelat, kačkavalj, masline, origano...",
+      en: "Tomato sauce, cheese, olives, oregano...",
+    },
     cena: 800,
-    kategorija: "Pizzas",
+    kategorija: "pice",
     vreme_pripreme: 25,
-    slika_url: "/images/margarita.webp",
+    slika_url: "/images/margarita.jpg",
   },
   {
     id: "3",
-    naziv: "Cezar salata",
-    opis: "Piletina, krutoni, cezar dresing...",
+    naziv: { sr: "Cezar salata", en: "Caesar Salad" },
+    opis: {
+      sr: "Piletina, krutoni, cezar dresing...",
+      en: "Chicken, croutons, caesar dressing...",
+    },
     cena: 650,
-    kategorija: "Salads",
+    kategorija: "salate",
     vreme_pripreme: 10,
-    slika_url: "/images/cezar-salata.webp",
+    slika_url: "/images/cezar-salata.jpg",
   },
   {
     id: "4",
-    naziv: "Domaća palačinka",
-    opis: "Nutela, plazma, šlag...",
+    naziv: { sr: "Domaća palačinka", en: "Homemade Pancake" },
+    opis: {
+      sr: "Nutela, plazma, šlag...",
+      en: "Nutella, biscuit crumbs, whipped cream...",
+    },
     cena: 350,
-    kategorija: "Desserts",
+    kategorija: "deserti",
     vreme_pripreme: 8,
-    slika_url: "/images/palacinka.webp",
+    slika_url: "/images/palacinka.jpg",
   },
 ];
 
-const KATEGORIJE = ["Burgers", "Pizzas", "Salads", "Desserts"];
 const DODACI_MENI = [
-  { id: "k1", naziv: "Kajmak", cena: 80 },
-  { id: "s1", naziv: "Slaninica", cena: 60 },
-  { id: "d1", naziv: "Dupli kačkavalj", cena: 100 },
+  { id: "k1", naziv: { sr: "Kajmak", en: "Kaymak" }, cena: 80 },
+  { id: "s1", naziv: { sr: "Slaninica", en: "Bacon" }, cena: 60 },
+  { id: "d1", naziv: { sr: "Dupli kačkavalj", en: "Extra cheese" }, cena: 100 },
 ];
 
 // Konstante za procenu vremena pripreme - lako se štimuju kasnije
@@ -95,7 +120,6 @@ const PREVOD_STATUSA = {
 
 const PREVODI = {
   sr: {
-    openNow: "Otvoreno",
     cart: "Tvoja korpa",
     cartEmpty: "Korpa je prazna. Dodaj nešto sa menija!",
     deliveryDetails: "Podaci za dostavu (Plaćanje pouzećem)",
@@ -111,8 +135,6 @@ const PREVODI = {
     orderId: "Kod tvoje porudžbine",
     statusLabel: "Trenutni status",
     refreshBtn: "Osveži status porudžbine",
-    wait: "Sačekaj",
-    cooldownNote: "Status možeš proveriti jednom na svaka 3 minuta.",
     premiumExtras: "Izaberi dodatke:",
     addToCart: "Dodaj u korpu",
     menuTab: "Meni",
@@ -122,9 +144,13 @@ const PREVODI = {
     almostDone: "Uskoro gotovo",
     viewCart: "Pogledaj korpu",
     removeItem: "Ukloni",
+    freeDeliveryFrom: `Besplatna dostava od ${PRAG_BESPLATNE_DOSTAVE} RSD`,
+    enterCode: "Unesi kod porudžbine",
+    trackCodePlaceholder: "npr. 48213",
+    trackCodeBtn: "Prati",
+    orLastOrder: "ili tvoja poslednja porudžbina:",
   },
   en: {
-    openNow: "Open Now",
     cart: "Your Cart",
     cartEmpty: "Your cart is empty. Add items from the menu!",
     deliveryDetails: "Delivery Details (Cash on Delivery)",
@@ -140,8 +166,6 @@ const PREVODI = {
     orderId: "Your Order ID",
     statusLabel: "Status",
     refreshBtn: "Refresh Status",
-    wait: "Wait",
-    cooldownNote: "Updates can be requested once every 3 minutes.",
     premiumExtras: "Choose extras:",
     addToCart: "Add to Cart",
     menuTab: "Menu",
@@ -151,20 +175,76 @@ const PREVODI = {
     almostDone: "Almost done",
     viewCart: "View cart",
     removeItem: "Remove",
+    freeDeliveryFrom: `Free delivery from ${PRAG_BESPLATNE_DOSTAVE} RSD`,
+    enterCode: "Enter order code",
+    trackCodePlaceholder: "e.g. 48213",
+    trackCodeBtn: "Track",
+    orLastOrder: "or your last order:",
   },
 };
+
+// ---- Jednostavne, čiste SVG ikonice za navigaciju (bez emoji-ja) ----
+function IkonicaMeni({ aktivna }) {
+  return (
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={aktivna ? 2.4 : 1.8}
+      strokeLinecap="round"
+    >
+      <path d="M4 6h16M4 12h16M4 18h10" />
+    </svg>
+  );
+}
+function IkonicaKorpa({ aktivna }) {
+  return (
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={aktivna ? 2.4 : 1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M6 8V6a6 6 0 0112 0v2M4 8h16l-1.2 12.2a2 2 0 01-2 1.8H7.2a2 2 0 01-2-1.8L4 8z" />
+    </svg>
+  );
+}
+function IkonicaPrati({ aktivna }) {
+  return (
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={aktivna ? 2.4 : 1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3.5 2" />
+    </svg>
+  );
+}
 
 export default function Home() {
   const [jezik, setJezik] = useState("sr");
   const [aktivniTab, setAktivniTab] = useState("meni");
-  const [selektovanaKategorija, setSelektovanaKategorija] = useState("Burgers");
+  const [selektovanaKategorija, setSelektovanaKategorija] = useState("burgeri");
   const [otvorenPanelJelo, setOtvorenPanelJelo] = useState(null);
   const [korpa, setKorpa] = useState([]);
   const [izabraniDodaci, setIzabraniDodaci] = useState([]);
   const [forma, setForma] = useState({ ime: "", telefon: "", adresa: "" });
   const [aktivniIdPorudzbine, setAktivniIdPorudzbine] = useState("");
+  const [unetiKod, setUnetiKod] = useState("");
   const [statusPorudzbine, setStatusPorudzbine] = useState(null);
-  const [preostaloVreme, setPreostaloVreme] = useState(0);
+  const [preostaloVreme, setPreostaloVreme] = useState(0); // interno rate-limitovanje, NE prikazuje se korisniku
   const [preostaloCekanjeSek, setPreostaloCekanjeSek] = useState(null);
   const [slanjeUToku, setSlanjeUToku] = useState(false);
   const [osvezavanjeUToku, setOsvezavanjeUToku] = useState(false);
@@ -177,7 +257,8 @@ export default function Home() {
     if (sacuvan) setAktivniIdPorudzbine(sacuvan);
   }, []);
 
-  // ---- Cooldown tajmer (180s) ----
+  // ---- Interni cooldown tajmer (180s) - koristimo ga da zaštitimo Firestore
+  // troškove od prečestih poziva, ali ovo se NIKAD ne prikazuje korisniku ----
   useEffect(() => {
     if (preostaloVreme <= 0) return;
     const interval = setInterval(() => setPreostaloVreme((p) => p - 1), 1000);
@@ -204,7 +285,7 @@ export default function Home() {
   // ---- Auto-učitaj status porudžbine kad korisnik otvori "Prati" sa sačuvanim brojem ----
   useEffect(() => {
     if (aktivniIdPorudzbine && !statusPorudzbine) {
-      osveziStatusPorudzbine();
+      osveziStatusPorudzbine(aktivniIdPorudzbine);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aktivniIdPorudzbine]);
@@ -213,7 +294,8 @@ export default function Home() {
     (sum, item) => sum + item.cena_po_komadu * item.kolicina,
     0,
   );
-  const trosakDostave = cenaStavki > 0 && cenaStavki < 1500 ? 200 : 0;
+  const trosakDostave =
+    cenaStavki > 0 && cenaStavki < PRAG_BESPLATNE_DOSTAVE ? CENA_DOSTAVE : 0;
   const ukupnaCena = cenaStavki + trosakDostave;
   const brojStavkiKorpe = korpa.reduce((s, i) => s + i.kolicina, 0);
 
@@ -236,10 +318,13 @@ export default function Home() {
       ...prev,
       {
         id_stavke: Date.now().toString(),
-        naziv: otvorenPanelJelo.naziv,
+        naziv: otvorenPanelJelo.naziv[jezik],
         cena_po_komadu: otvorenPanelJelo.cena + cenaDodataka,
         vreme_pripreme: otvorenPanelJelo.vreme_pripreme,
-        dodaci: izabraniDodaci,
+        dodaci: izabraniDodaci.map((d) => ({
+          naziv: d.naziv[jezik],
+          cena: d.cena,
+        })),
         kolicina: 1,
       },
     ]);
@@ -341,20 +426,23 @@ export default function Home() {
     }
   };
 
-  // ---- Ručno osvežavanje statusa (i inicijalni auto-load), 180s cooldown ----
-  const osveziStatusPorudzbine = async () => {
-    if (!aktivniIdPorudzbine || preostaloVreme > 0 || osvezavanjeUToku) return;
+  // ---- Osvežavanje statusa - i dalje interno limitirano na 180s, ali ovo se
+  // NIKAD ne pokazuje korisniku (dugme uvek izgleda isto, klik u međuvremenu
+  // se samo tiho ignoriše da zaštitimo Firestore troškove) ----
+  const osveziStatusPorudzbine = async (kod) => {
+    const ciljniKod = kod || aktivniIdPorudzbine;
+    if (!ciljniKod || preostaloVreme > 0 || osvezavanjeUToku) return;
     setOsvezavanjeUToku(true);
     try {
-      const snap = await getDoc(
-        doc(db, "status_porudzbine", aktivniIdPorudzbine),
-      );
+      const snap = await getDoc(doc(db, "status_porudzbine", ciljniKod));
       if (snap.exists()) {
         setStatusPorudzbine(snap.data());
       } else {
         setStatusPorudzbine(null);
-        localStorage.removeItem("id_porudzbine");
-        setAktivniIdPorudzbine("");
+        if (ciljniKod === aktivniIdPorudzbine) {
+          localStorage.removeItem("id_porudzbine");
+          setAktivniIdPorudzbine("");
+        }
       }
       setPreostaloVreme(180);
     } catch (greska) {
@@ -364,13 +452,23 @@ export default function Home() {
     }
   };
 
+  const hendlajPracenjeKoda = (e) => {
+    e.preventDefault();
+    if (!unetiKod || osvezavanjeUToku) return;
+    setPreostaloVreme(0); // nov kod = dozvoli odmah prvu proveru
+    setStatusPorudzbine(null);
+    localStorage.setItem("id_porudzbine", unetiKod);
+    setAktivniIdPorudzbine(unetiKod);
+    setUnetiKod("");
+  };
+
   return (
-    <div className="max-w-md md:max-w-3xl mx-auto bg-slate-50 min-h-screen pb-24 font-sans antialiased text-slate-800">
+    <div className="min-h-screen bg-slate-50 font-sans antialiased text-slate-800 flex flex-col">
       <Head>
-        <title>Gradski Zalogaj — Naruči online</title>
+        <title>{NAZIV_RESTORANA} — Naruči online</title>
         <meta
           name="description"
-          content="Naručite omiljenu hranu online iz Gradskog Zalogaja. Brza dostava, plaćanje pouzećem."
+          content={`Naručite omiljenu hranu online iz restorana ${NAZIV_RESTORANA}. Brza dostava, plaćanje pouzećem.`}
         />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <script
@@ -379,54 +477,91 @@ export default function Home() {
             __html: JSON.stringify({
               "@context": "https://schema.org",
               "@type": "Restaurant",
-              name: "Gradski Zalogaj",
+              name: NAZIV_RESTORANA,
               servesCuisine: "Balkan",
               priceRange: "$$",
+              // Teritorija dostave - samo u strukturisanim podacima za pretragu,
+              // nikad kao vidljiv tekst na strani
+              areaServed: [
+                { "@type": "City", name: "Smederevska Palanka" },
+                { "@type": "City", name: "Velika Plana" },
+              ],
             }),
           }}
         />
       </Head>
 
       <header className="bg-white p-4 shadow-sm flex justify-between items-center sticky top-0 z-40">
-        <div>
-          <h1 className="text-xl font-black text-slate-900 tracking-tight">
-            Gradski Zalogaj
-          </h1>
-          <p className="text-xs text-emerald-600 font-bold flex items-center gap-1">
-            <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>{" "}
-            {t.openNow}
-          </p>
-        </div>
-        <button
-          onClick={() => setJezik(jezik === "sr" ? "en" : "sr")}
-          className="text-xs font-black bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg border border-slate-200 transition-all uppercase"
-          aria-label="Promeni jezik"
-        >
-          {jezik === "sr" ? "EN" : "SR"}
-        </button>
-      </header>
-
-      {aktivniTab === "meni" && (
-        <main className="p-4">
-          <div className="flex gap-2 overflow-x-auto pb-4 whitespace-nowrap">
-            {KATEGORIJE.map((kat) => (
-              <button
-                key={kat}
-                onClick={() => setSelektovanaKategorija(kat)}
-                className={`px-4 py-2 rounded-full font-bold text-sm transition-all ${
-                  selektovanaKategorija === kat
-                    ? "bg-slate-900 text-white shadow-md"
-                    : "bg-white text-slate-600 border border-slate-100"
-                }`}
-              >
-                {kat}
-              </button>
-            ))}
+        <div className="max-w-7xl mx-auto w-full flex justify-between items-center">
+          <div className="relative h-9 w-36">
+            <Image
+              src="/images/logo.png"
+              alt={NAZIV_RESTORANA}
+              fill
+              sizes="144px"
+              className="object-contain object-left"
+              priority
+            />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
-            {JELOVNIK.filter((j) => j.kategorija === selektovanaKategorija).map(
-              (jelo) => (
+          <nav className="hidden md:flex items-center gap-6">
+            <button
+              onClick={() => setAktivniTab("meni")}
+              className={`text-sm font-bold transition-all ${aktivniTab === "meni" ? "text-slate-900" : "text-slate-500 hover:text-slate-700"}`}
+            >
+              {t.menuTab}
+            </button>
+            <button
+              onClick={() => setAktivniTab("korpa")}
+              className={`text-sm font-bold transition-all ${aktivniTab === "korpa" ? "text-slate-900" : "text-slate-500 hover:text-slate-700"}`}
+            >
+              {t.cartTab} {brojStavkiKorpe > 0 && `(${brojStavkiKorpe})`}
+            </button>
+            <button
+              onClick={() => setAktivniTab("prati")}
+              className={`text-sm font-bold transition-all ${aktivniTab === "prati" ? "text-slate-900" : "text-slate-500 hover:text-slate-700"}`}
+            >
+              {t.trackTab}
+            </button>
+          </nav>
+
+          <button
+            onClick={() => setJezik(jezik === "sr" ? "en" : "sr")}
+            className="text-xs font-black bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg border border-slate-200 transition-all uppercase"
+            aria-label="Promeni jezik"
+          >
+            {jezik === "sr" ? "EN" : "SR"}
+          </button>
+        </div>
+      </header>
+
+      <div className="flex-1 w-full pb-24 md:pb-8">
+        {aktivniTab === "meni" && (
+          <main className="p-4 max-w-7xl mx-auto">
+            <div className="flex gap-2 overflow-x-auto pb-4 whitespace-nowrap">
+              {KATEGORIJE.map((kat) => (
+                <button
+                  key={kat.id}
+                  onClick={() => setSelektovanaKategorija(kat.id)}
+                  className={`px-4 py-2 rounded-full font-bold text-sm transition-all ${
+                    selektovanaKategorija === kat.id
+                      ? "bg-slate-900 text-white shadow-md"
+                      : "bg-white text-slate-600 border border-slate-100"
+                  }`}
+                >
+                  {kat[jezik]}
+                </button>
+              ))}
+            </div>
+
+            <p className="text-xs font-bold text-emerald-600 mb-3">
+              {t.freeDeliveryFrom}
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              {JELOVNIK.filter(
+                (j) => j.kategorija === selektovanaKategorija,
+              ).map((jelo) => (
                 <div
                   key={jelo.id}
                   className="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3"
@@ -434,7 +569,7 @@ export default function Home() {
                   <div className="relative w-20 h-20 flex-shrink-0 rounded-xl overflow-hidden bg-slate-100">
                     <Image
                       src={jelo.slika_url}
-                      alt={jelo.naziv}
+                      alt={jelo.naziv[jezik]}
                       fill
                       sizes="80px"
                       className="object-cover"
@@ -442,10 +577,10 @@ export default function Home() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="font-bold text-slate-900 text-base truncate">
-                      {jelo.naziv}
+                      {jelo.naziv[jezik]}
                     </h3>
                     <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">
-                      {jelo.opis}
+                      {jelo.opis[jezik]}
                     </p>
                     <p className="font-extrabold text-slate-900 mt-2">
                       {jelo.cena} RSD
@@ -453,221 +588,240 @@ export default function Home() {
                   </div>
                   <button
                     onClick={() => otvoriDodatke(jelo)}
-                    aria-label={`Dodaj ${jelo.naziv}`}
+                    aria-label={`${t.addToCart} ${jelo.naziv[jezik]}`}
                     className="bg-slate-900 text-white w-9 h-9 rounded-xl flex items-center justify-center font-bold shadow-md flex-shrink-0"
                   >
                     +
                   </button>
                 </div>
-              ),
-            )}
-          </div>
-        </main>
-      )}
+              ))}
+            </div>
+          </main>
+        )}
 
-      {aktivniTab === "korpa" && (
-        <main className="p-4 max-w-xl mx-auto">
-          <h2 className="text-lg font-bold text-slate-900 mb-4">{t.cart}</h2>
-          {korpa.length === 0 ? (
-            <p className="text-slate-500 text-sm text-center py-8">
-              {t.cartEmpty}
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {korpa.map((item) => (
-                <div
-                  key={item.id_stavke}
-                  className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex justify-between items-center"
-                >
-                  <div>
-                    <h4 className="font-bold text-slate-900 text-sm">
-                      {item.naziv}
-                    </h4>
-                    {item.dodaci.length > 0 && (
-                      <p className="text-[11px] text-slate-500 font-medium">
-                        + {item.dodaci.map((d) => d.naziv).join(", ")}
+        {aktivniTab === "korpa" && (
+          <main className="p-4 max-w-xl mx-auto">
+            <h2 className="text-lg font-bold text-slate-900 mb-4">{t.cart}</h2>
+            {korpa.length === 0 ? (
+              <p className="text-slate-500 text-sm text-center py-8">
+                {t.cartEmpty}
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {korpa.map((item) => (
+                  <div
+                    key={item.id_stavke}
+                    className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex justify-between items-center"
+                  >
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-sm">
+                        {item.naziv}
+                      </h4>
+                      {item.dodaci.length > 0 && (
+                        <p className="text-[11px] text-slate-500 font-medium">
+                          + {item.dodaci.map((d) => d.naziv).join(", ")}
+                        </p>
+                      )}
+                      <p className="font-bold text-slate-900 text-xs mt-1">
+                        {item.cena_po_komadu * item.kolicina} RSD
                       </p>
-                    )}
-                    <p className="font-bold text-slate-900 text-xs mt-1">
-                      {item.cena_po_komadu * item.kolicina} RSD
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="bg-slate-100 rounded-lg flex items-center p-1 gap-2">
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="bg-slate-100 rounded-lg flex items-center p-1 gap-2">
+                        <button
+                          onClick={() => promeniKolicinu(item.id_stavke, "-")}
+                          className="px-2 font-bold text-slate-700"
+                          aria-label="Smanji količinu"
+                        >
+                          -
+                        </button>
+                        <span className="text-xs font-bold text-slate-900">
+                          {item.kolicina}
+                        </span>
+                        <button
+                          onClick={() => promeniKolicinu(item.id_stavke, "+")}
+                          className="px-2 font-bold text-slate-700"
+                          aria-label="Povećaj količinu"
+                        >
+                          +
+                        </button>
+                      </div>
                       <button
-                        onClick={() => promeniKolicinu(item.id_stavke, "-")}
-                        className="px-2 font-bold text-slate-700"
-                        aria-label="Smanji količinu"
+                        onClick={() => ukloniStavku(item.id_stavke)}
+                        className="text-slate-500 hover:text-red-600 font-bold text-sm p-1"
+                        aria-label={`${t.removeItem} ${item.naziv}`}
                       >
-                        -
-                      </button>
-                      <span className="text-xs font-bold text-slate-900">
-                        {item.kolicina}
-                      </span>
-                      <button
-                        onClick={() => promeniKolicinu(item.id_stavke, "+")}
-                        className="px-2 font-bold text-slate-700"
-                        aria-label="Povećaj količinu"
-                      >
-                        +
+                        ✕
                       </button>
                     </div>
-                    <button
-                      onClick={() => ukloniStavku(item.id_stavke)}
-                      className="text-slate-500 hover:text-red-600 font-bold text-sm p-1"
-                      aria-label={`${t.removeItem} ${item.naziv}`}
-                    >
-                      ✕
-                    </button>
+                  </div>
+                ))}
+
+                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm text-xs space-y-2 mt-4">
+                  <div className="flex justify-between text-slate-500">
+                    <span>{t.subtotal}:</span>
+                    <span className="font-bold">{cenaStavki} RSD</span>
+                  </div>
+                  <div className="flex justify-between text-slate-500">
+                    <span>{t.delivery}:</span>
+                    <span className="font-bold">
+                      {trosakDostave === 0
+                        ? "0 RSD 🎉"
+                        : `${trosakDostave} RSD`}
+                    </span>
+                  </div>
+                  {trosakDostave > 0 && (
+                    <p className="text-[11px] text-emerald-600 font-bold">
+                      {t.freeDeliveryFrom}
+                    </p>
+                  )}
+                  <hr className="border-slate-100 my-1" />
+                  <div className="flex justify-between text-slate-950 font-black text-sm">
+                    <span>{t.total}:</span>
+                    <span>{ukupnaCena} RSD</span>
                   </div>
                 </div>
-              ))}
 
-              <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm text-xs space-y-2 mt-4">
-                <div className="flex justify-between text-slate-500">
-                  <span>{t.subtotal}:</span>
-                  <span className="font-bold">{cenaStavki} RSD</span>
-                </div>
-                <div className="flex justify-between text-slate-500">
-                  <span>{t.delivery}:</span>
-                  <span className="font-bold">{trosakDostave} RSD</span>
-                </div>
-                <hr className="border-slate-100 my-1" />
-                <div className="flex justify-between text-slate-950 font-black text-sm">
-                  <span>{t.total}:</span>
-                  <span>{ukupnaCena} RSD</span>
-                </div>
-              </div>
-
-              <form
-                onSubmit={posaljiPorudzbinu}
-                className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm mt-4 space-y-3"
-              >
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
-                  {t.deliveryDetails}
-                </h3>
-                <input
-                  required
-                  type="text"
-                  placeholder={t.name}
-                  value={forma.ime}
-                  onChange={(e) => setForma({ ...forma, ime: e.target.value })}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-sm"
-                  aria-label={t.name}
-                />
-                <input
-                  required
-                  type="tel"
-                  placeholder={t.phone}
-                  value={forma.telefon}
-                  onChange={(e) =>
-                    setForma({ ...forma, telefon: e.target.value })
-                  }
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-sm"
-                  aria-label={t.phone}
-                />
-                <input
-                  required
-                  type="text"
-                  placeholder={t.address}
-                  value={forma.adresa}
-                  onChange={(e) =>
-                    setForma({ ...forma, adresa: e.target.value })
-                  }
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-sm"
-                  aria-label={t.address}
-                />
-                <button
-                  type="submit"
-                  disabled={slanjeUToku}
-                  className="w-full bg-slate-900 disabled:bg-slate-300 text-white font-bold p-3.5 rounded-xl shadow-md text-sm transition-all hover:bg-slate-800"
+                <form
+                  onSubmit={posaljiPorudzbinu}
+                  className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm mt-4 space-y-3"
                 >
-                  {slanjeUToku ? "..." : t.placeOrder}
-                </button>
-              </form>
-            </div>
-          )}
-        </main>
-      )}
-
-      {aktivniTab === "prati" && (
-        <main className="p-4 text-center max-w-md mx-auto">
-          <h2 className="text-lg font-bold text-slate-900 mb-6">
-            {t.trackOrder}
-          </h2>
-          {!aktivniIdPorudzbine ? (
-            <p className="text-slate-500 text-sm py-8">{t.noOrders}</p>
-          ) : (
-            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-5">
-              <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">
-                {t.orderId}
-              </span>
-              <p className="text-2xl font-black text-slate-900 mt-0">
-                #{aktivniIdPorudzbine}
-              </p>
-
-              <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-sm">
-                <span className="text-xs text-slate-500 block mb-0.5">
-                  {t.statusLabel}:
-                </span>
-                <span className="font-extrabold text-amber-600">
-                  {statusPorudzbine
-                    ? PREVOD_STATUSA[jezik][statusPorudzbine.status]
-                    : "—"}
-                </span>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
+                    {t.deliveryDetails}
+                  </h3>
+                  <input
+                    required
+                    type="text"
+                    placeholder={t.name}
+                    value={forma.ime}
+                    onChange={(e) =>
+                      setForma({ ...forma, ime: e.target.value })
+                    }
+                    className="w-full border border-slate-200 rounded-lg p-2.5 text-sm"
+                    aria-label={t.name}
+                  />
+                  <input
+                    required
+                    type="tel"
+                    placeholder={t.phone}
+                    value={forma.telefon}
+                    onChange={(e) =>
+                      setForma({ ...forma, telefon: e.target.value })
+                    }
+                    className="w-full border border-slate-200 rounded-lg p-2.5 text-sm"
+                    aria-label={t.phone}
+                  />
+                  <input
+                    required
+                    type="text"
+                    placeholder={t.address}
+                    value={forma.adresa}
+                    onChange={(e) =>
+                      setForma({ ...forma, adresa: e.target.value })
+                    }
+                    className="w-full border border-slate-200 rounded-lg p-2.5 text-sm"
+                    aria-label={t.address}
+                  />
+                  <button
+                    type="submit"
+                    disabled={slanjeUToku}
+                    className="w-full bg-slate-900 disabled:bg-slate-300 text-white font-bold p-3.5 rounded-xl shadow-md text-sm transition-all hover:bg-slate-800"
+                  >
+                    {slanjeUToku ? "..." : t.placeOrder}
+                  </button>
+                </form>
               </div>
+            )}
+          </main>
+        )}
 
-              {statusPorudzbine && statusPorudzbine.status !== "zavrseno" && (
+        {aktivniTab === "prati" && (
+          <main className="p-4 text-center max-w-md mx-auto">
+            <h2 className="text-lg font-bold text-slate-900 mb-6">
+              {t.trackOrder}
+            </h2>
+
+            <form onSubmit={hendlajPracenjeKoda} className="flex gap-2 mb-6">
+              <input
+                type="text"
+                inputMode="numeric"
+                value={unetiKod}
+                onChange={(e) => setUnetiKod(e.target.value.replace(/\D/g, ""))}
+                placeholder={t.trackCodePlaceholder}
+                className="flex-1 border border-slate-200 rounded-lg p-2.5 text-sm text-center"
+                aria-label={t.enterCode}
+              />
+              <button
+                type="submit"
+                className="bg-slate-900 text-white font-bold text-sm px-5 rounded-lg"
+              >
+                {t.trackCodeBtn}
+              </button>
+            </form>
+
+            {!aktivniIdPorudzbine ? (
+              <p className="text-slate-500 text-sm py-8">{t.noOrders}</p>
+            ) : (
+              <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-5">
+                <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">
+                  {t.orderId}
+                </span>
+                <p className="text-2xl font-black text-slate-900 mt-0">
+                  #{aktivniIdPorudzbine}
+                </p>
+
                 <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-sm">
                   <span className="text-xs text-slate-500 block mb-0.5">
-                    {t.estimatedWait}:
+                    {t.statusLabel}:
                   </span>
-                  <span className="font-extrabold text-slate-900">
-                    {preostaloCekanjeSek === null
-                      ? "—"
-                      : preostaloCekanjeSek <= 0
-                        ? t.almostDone
-                        : `~${Math.ceil(preostaloCekanjeSek / 60)} min`}
+                  <span className="font-extrabold text-amber-600">
+                    {statusPorudzbine
+                      ? PREVOD_STATUSA[jezik][statusPorudzbine.status]
+                      : "—"}
                   </span>
                 </div>
-              )}
 
-              <p className="text-[11px] text-slate-500 font-medium">
-                {t.cooldownNote}
-              </p>
-              <button
-                onClick={osveziStatusPorudzbine}
-                disabled={preostaloVreme > 0 || osvezavanjeUToku}
-                className={`w-full font-bold text-sm p-3.5 rounded-xl shadow-sm transition-all ${
-                  preostaloVreme > 0 || osvezavanjeUToku
-                    ? "bg-slate-100 text-slate-500 cursor-not-allowed"
-                    : "bg-slate-900 text-white hover:bg-slate-800"
-                }`}
-                aria-label={t.refreshBtn}
-              >
-                {preostaloVreme > 0
-                  ? `${t.wait} (${Math.floor(preostaloVreme / 60)}:${String(preostaloVreme % 60).padStart(2, "0")})`
-                  : osvezavanjeUToku
-                    ? "..."
-                    : t.refreshBtn}
-              </button>
-            </div>
-          )}
-        </main>
-      )}
+                {statusPorudzbine && statusPorudzbine.status !== "zavrseno" && (
+                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-sm">
+                    <span className="text-xs text-slate-500 block mb-0.5">
+                      {t.estimatedWait}:
+                    </span>
+                    <span className="font-extrabold text-slate-900">
+                      {preostaloCekanjeSek === null
+                        ? "—"
+                        : preostaloCekanjeSek <= 0
+                          ? t.almostDone
+                          : `~${Math.ceil(preostaloCekanjeSek / 60)} min`}
+                    </span>
+                  </div>
+                )}
+
+                {/* Dugme UVEK izgleda isto - interni 180s cooldown se ne otkriva korisniku */}
+                <button
+                  onClick={() => osveziStatusPorudzbine()}
+                  className="w-full font-bold text-sm p-3.5 rounded-xl shadow-sm transition-all bg-slate-900 text-white hover:bg-slate-800"
+                  aria-label={t.refreshBtn}
+                >
+                  {osvezavanjeUToku ? "..." : t.refreshBtn}
+                </button>
+              </div>
+            )}
+          </main>
+        )}
+      </div>
 
       {otvorenPanelJelo && (
         <div
-          className="fixed inset-0 bg-black/40 z-50 flex items-end"
+          className="fixed inset-0 bg-black/40 z-50 flex items-end md:items-center justify-center"
           onClick={() => setOtvorenPanelJelo(null)}
         >
           <div
-            className="bg-white w-full max-w-md mx-auto rounded-t-3xl p-5 space-y-4 shadow-2xl animate-fade-in-up"
+            className="bg-white w-full max-w-md md:rounded-3xl rounded-t-3xl p-5 space-y-4 shadow-2xl animate-fade-in-up"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-black text-slate-900">
-                {otvorenPanelJelo.naziv}
+                {otvorenPanelJelo.naziv[jezik]}
               </h3>
               <button
                 onClick={() => setOtvorenPanelJelo(null)}
@@ -696,7 +850,7 @@ export default function Home() {
                         : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
                     }`}
                   >
-                    <span>{dodatak.naziv}</span>
+                    <span>{dodatak.naziv[jezik]}</span>
                     <span>+{dodatak.cena} RSD</span>
                   </button>
                 );
@@ -716,46 +870,99 @@ export default function Home() {
       {aktivniTab === "meni" && korpa.length > 0 && (
         <button
           onClick={() => setAktivniTab("korpa")}
-          className="fixed bottom-[72px] left-4 right-4 max-w-md md:max-w-3xl mx-auto bg-emerald-600 text-white font-bold text-sm py-3.5 rounded-xl shadow-lg z-40 flex justify-between items-center px-5"
+          className="fixed bottom-[72px] md:bottom-6 left-4 right-4 max-w-md md:max-w-sm md:left-auto md:right-6 mx-auto md:mx-0 bg-emerald-600 text-white font-bold text-sm py-3.5 rounded-xl shadow-lg z-40 flex justify-between items-center px-5"
           aria-label={t.viewCart}
         >
           <span>
-            {t.viewCart} ({brojStavkiKorpe}{" "}
-            {brojStavkiKorpe === 1 ? "stavka" : "stavke"})
+            {t.viewCart} ({brojStavkiKorpe})
           </span>
           <span>{cenaStavki} RSD</span>
         </button>
       )}
 
-      <nav className="fixed bottom-0 left-0 right-0 max-w-md md:max-w-3xl mx-auto bg-white border-t border-slate-100 py-2 px-4 flex justify-around items-center shadow-lg z-40">
+      {/* Bottom tab bar - samo mobilni; desktop koristi header nav gore */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 py-2 px-4 flex justify-around items-center shadow-lg z-40">
         <button
           onClick={() => setAktivniTab("meni")}
-          className={`flex flex-col items-center gap-0.5 ${aktivniTab === "meni" ? "text-slate-900 font-bold" : "text-slate-500"}`}
+          className={`flex flex-col items-center gap-0.5 ${aktivniTab === "meni" ? "text-slate-900" : "text-slate-500"}`}
         >
-          <span className="text-lg" role="img" aria-label="Meni">
-            📋
-          </span>
-          <span className="text-[10px]">{t.menuTab}</span>
+          <IkonicaMeni aktivna={aktivniTab === "meni"} />
+          <span className="text-[10px] font-bold">{t.menuTab}</span>
         </button>
         <button
           onClick={() => setAktivniTab("korpa")}
-          className={`flex flex-col items-center gap-0.5 ${aktivniTab === "korpa" ? "text-slate-900 font-bold" : "text-slate-500"}`}
+          className={`flex flex-col items-center gap-0.5 relative ${aktivniTab === "korpa" ? "text-slate-900" : "text-slate-500"}`}
         >
-          <span className="text-lg" role="img" aria-label="Korpa">
-            🛍️
-          </span>
-          <span className="text-[10px]">{t.cartTab}</span>
+          <IkonicaKorpa aktivna={aktivniTab === "korpa"} />
+          {brojStavkiKorpe > 0 && (
+            <span className="absolute -top-1 right-1.5 bg-emerald-600 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+              {brojStavkiKorpe}
+            </span>
+          )}
+          <span className="text-[10px] font-bold">{t.cartTab}</span>
         </button>
         <button
           onClick={() => setAktivniTab("prati")}
-          className={`flex flex-col items-center gap-0.5 ${aktivniTab === "prati" ? "text-slate-900 font-bold" : "text-slate-500"}`}
+          className={`flex flex-col items-center gap-0.5 ${aktivniTab === "prati" ? "text-slate-900" : "text-slate-500"}`}
         >
-          <span className="text-lg" role="img" aria-label="Prati">
-            ⏱️
-          </span>
-          <span className="text-[10px]">{t.trackTab}</span>
+          <IkonicaPrati aktivna={aktivniTab === "prati"} />
+          <span className="text-[10px] font-bold">{t.trackTab}</span>
         </button>
       </nav>
+
+      {/* Footer - vidljiv na desktopu (scroll), na mobilnom je iznad fiksnog nav-a */}
+      <footer className="hidden md:block bg-white border-t border-slate-100 mt-8">
+        <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col sm:flex-row justify-between gap-6 text-sm text-slate-500">
+          <div>
+            <div className="relative h-8 w-32 mb-2">
+              <Image
+                src="/images/logo.png"
+                alt={NAZIV_RESTORANA}
+                fill
+                sizes="128px"
+                className="object-contain object-left"
+              />
+            </div>
+            <p className="text-xs">Smederevska Palanka, Srbija</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <a
+              href={INSTAGRAM_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Instagram"
+              className="hover:text-slate-800 transition-all"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+              >
+                <rect x="3" y="3" width="18" height="18" rx="5" />
+                <circle cx="12" cy="12" r="4" />
+                <circle
+                  cx="17.5"
+                  cy="6.5"
+                  r="0.6"
+                  fill="currentColor"
+                  stroke="none"
+                />
+              </svg>
+            </a>
+            <a
+              href={SAJT_ILICODE}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs hover:text-slate-800 transition-all"
+            >
+              Sajt napravio <span className="font-bold">Ilicode Studio</span>
+            </a>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

@@ -11,9 +11,6 @@ const nextConfig = {
     // stavljanja u /public/images/.
     unoptimized: true,
   },
-  basePath: '/bellavista-narucivanje',
-  assetPrefix: '/bellavista-narucivanje',
-  trailingSlash: true,
 };
 
 module.exports = nextConfig;
