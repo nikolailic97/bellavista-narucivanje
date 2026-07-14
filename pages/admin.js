@@ -13,7 +13,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { danasnjiDatum } from "../lib/pomocne";
-import { useInternoOsoblje } from "../hooks/useInternoOsoblje";
+import { useInternoOsoblje } from "../lib/hooks/userinternoosoblje";
 import KuhinjskaTabla from "../lib/components/KuhinjskaTabla";
 import PinPrijava from "../lib/components/PinPrijava";
 

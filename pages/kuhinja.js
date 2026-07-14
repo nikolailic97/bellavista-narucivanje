@@ -1,5 +1,5 @@
 import Head from "next/head";
-import { useInternoOsoblje } from "../hooks/useInternoOsoblje";
+import { useInternoOsoblje } from "../lib/hooks/userinternoosoblje";
 import KuhinjskaTabla from "../lib/components/KuhinjskaTabla";
 import PinPrijava from "../lib/components/PinPrijava";
 

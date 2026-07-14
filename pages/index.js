@@ -27,7 +27,7 @@ const JELOVNIK = [
     cena: 450,
     kategorija: "Burgers",
     vreme_pripreme: 15,
-    slika_url: "/images/pljeskavica.jpg",
+    slika_url: "/images/pljeskavica.webp",
   },
   {
     id: "2",
@@ -36,7 +36,7 @@ const JELOVNIK = [
     cena: 800,
     kategorija: "Pizzas",
     vreme_pripreme: 25,
-    slika_url: "/images/margarita.jpg",
+    slika_url: "/images/margarita.webp",
   },
   {
     id: "3",
@@ -45,7 +45,7 @@ const JELOVNIK = [
     cena: 650,
     kategorija: "Salads",
     vreme_pripreme: 10,
-    slika_url: "/images/cezar-salata.jpg",
+    slika_url: "/images/cezar-salata.webp",
   },
   {
     id: "4",
@@ -54,7 +54,7 @@ const JELOVNIK = [
     cena: 350,
     kategorija: "Desserts",
     vreme_pripreme: 8,
-    slika_url: "/images/palacinka.jpg",
+    slika_url: "/images/palacinka.webp",
   },
 ];
 

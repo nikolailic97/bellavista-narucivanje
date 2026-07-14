@@ -6,20 +6,18 @@
 
 const admin = require("firebase-admin");
 const serviceAccount = require("./service-account-key.json");
+const { getAuth } = require("firebase-admin/auth");
 
-admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+admin.initializeApp({ credential: admin.cert(serviceAccount) });
 
 async function postaviUloge() {
-  const kuhinja = await admin
-    .auth()
-    .getUserByEmail("kuhinja@internal.gradskizalogaj.rs");
-  await admin.auth().setCustomUserClaims(kuhinja.uid, { role: "kuhinja" });
+  const auth = getAuth();
+  const kuhinja = await auth.getUserByEmail("kuhinja@bellavista.rs");
+  await auth.setCustomUserClaims(kuhinja.uid, { role: "kuhinja" });
   console.log('Uloga "kuhinja" postavljena za:', kuhinja.email);
 
-  const adminNalog = await admin
-    .auth()
-    .getUserByEmail("admin@internal.gradskizalogaj.rs");
-  await admin.auth().setCustomUserClaims(adminNalog.uid, { role: "admin" });
+  const adminNalog = await auth.getUserByEmail("admin@bellavista.rs");
+  await auth.setCustomUserClaims(adminNalog.uid, { role: "admin" });
   console.log('Uloga "admin" postavljena za:', adminNalog.email);
 
   console.log(
