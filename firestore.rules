@@ -1,0 +1,57 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function jeOsoblje() {
+      return request.auth != null;
+    }
+    function jeUloga(uloga) {
+      return request.auth != null && request.auth.token.role == uloga;
+    }
+
+    // Pun dokument porudžbine — ime/telefon/adresa/cena, čita i piše samo osoblje.
+    // Gost sme samo da KREIRA (guest checkout), uz proveru da status i obavezna
+    // polja postoje (validacija cene nije moguća bez Cloud Function-a — svesna
+    // odluka u skladu sa zero-cost arhitekturom).
+    match /porudzbine/{id} {
+      allow create: if request.resource.data.status == 'novo'
+                    && request.resource.data.keys().hasAll([
+                         'broj', 'ime', 'telefon', 'adresa', 'stavke',
+                         'cena_ukupno', 'nacin_placanja', 'status',
+                         'datum', 'vreme_kreiranja', 'trajanje_procena_min'
+                       ]);
+      allow read, update, delete: if jeOsoblje();
+    }
+
+    // Javni dokument — SAMO status + vremenski podaci, nikad lični podaci/cena.
+    // Ovo je jedino što kupac ikad čita (tracking ekran), doc ID = broj porudžbine.
+    match /status_porudzbine/{broj} {
+      allow create: if request.resource.data.status == 'novo'
+                    && request.resource.data.keys().hasAll([
+                         'status', 'vreme_kreiranja', 'trajanje_procena_min'
+                       ]);
+      allow read: if true;
+      allow update, delete: if jeOsoblje();
+    }
+
+    // Dnevni izveštaji — poverljivi podaci o prihodu, čita SAMO admin (Owner
+    // Analytics). Piše osoblje (kuhinja ili admin preko "Zatvori poslovni dan").
+    match /izvestaji/{datum} {
+      allow read: if jeUloga('admin');
+      allow write: if jeOsoblje();
+    }
+
+    // Lagani javni marker "da li je dan zatvoren" — bez prihoda/porudžbina,
+    // sme da ga čita i kuhinja (potrebno za idempotentnost dugmeta "Zatvori
+    // poslovni dan" bez pristupa poverljivim izvestaji podacima).
+    match /izvestaji_status/{datum} {
+      allow read, write: if jeOsoblje();
+    }
+  }
+}
+
+// NAPOMENA: validacija cene pri kreiranju porudžbine nije moguća bez Cloud
+// Function-a (svesna odluka, u skladu sa zero-cost arhitekturom). Rules
+// proveravaju samo da status pri kreiranju bude "novo" i da obavezna polja
+// postoje — dovoljno da spreči slučajno/nepotpuno upisane dokumente, ne i
+// zlonamerno menjanje cena (isti nivo poverenja kao i ostatak MVP-a).

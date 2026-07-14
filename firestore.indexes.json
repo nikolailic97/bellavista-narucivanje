@@ -1,0 +1,14 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "porudzbine",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "datum", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "vreme_kreiranja", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
