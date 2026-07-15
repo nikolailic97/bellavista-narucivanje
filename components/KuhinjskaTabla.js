@@ -1,5 +1,5 @@
-import { NAZIV_STATUSA, NAZIV_SLEDECE_AKCIJE } from "../constants";
-import { jeliKasni } from "../pomocne";
+import { NAZIV_STATUSA, NAZIV_SLEDECE_AKCIJE } from "../lib/constants";
+import { jeliKasni } from "../lib/pomocne";
 
 export default function KuhinjskaTabla({
   porudzbine,
