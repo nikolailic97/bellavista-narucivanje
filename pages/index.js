@@ -259,11 +259,47 @@ const JELOVNIK = [
   },
 ];
 
-const DODACI_MENI = [
-  { id: "k1", naziv: { sr: "Kajmak", en: "Kaymak" }, cena: 80 },
-  { id: "s1", naziv: { sr: "Slaninica", en: "Bacon" }, cena: 60 },
-  { id: "d1", naziv: { sr: "Dupli kačkavalj", en: "Extra cheese" }, cena: 100 },
-];
+const DODACI_PO_KATEGORIJI = {
+  burgeri: [
+    { id: "k1", naziv: { sr: "Kajmak", en: "Kaymak" }, cena: 80 },
+    { id: "s1", naziv: { sr: "Slaninica", en: "Bacon" }, cena: 60 },
+    {
+      id: "d1",
+      naziv: { sr: "Dupli kačkavalj", en: "Extra cheese" },
+      cena: 100,
+    },
+  ],
+  pice: [
+    { id: "p1", naziv: { sr: "Ekstra sir", en: "Extra cheese" }, cena: 100 },
+    { id: "p2", naziv: { sr: "Pečurke", en: "Mushrooms" }, cena: 80 },
+    { id: "p3", naziv: { sr: "Šunka", en: "Ham" }, cena: 90 },
+    {
+      id: "p4",
+      naziv: { sr: "Ljuta papričica", en: "Chili peppers" },
+      cena: 50,
+    },
+  ],
+  salate: [
+    {
+      id: "sl1",
+      naziv: { sr: "Ekstra piletina", en: "Extra chicken" },
+      cena: 120,
+    },
+    { id: "sl2", naziv: { sr: "Avokado", en: "Avocado" }, cena: 100 },
+    { id: "sl3", naziv: { sr: "Feta sir", en: "Feta cheese" }, cena: 80 },
+    { id: "sl4", naziv: { sr: "Susam", en: "Sesame seeds" }, cena: 40 },
+  ],
+  deserti: [
+    { id: "de1", naziv: { sr: "Banana", en: "Banana" }, cena: 50 },
+    { id: "de2", naziv: { sr: "Jagode", en: "Strawberries" }, cena: 70 },
+    { id: "de3", naziv: { sr: "Lešnici", en: "Crushed hazelnuts" }, cena: 60 },
+    {
+      id: "de4",
+      naziv: { sr: "Kugla sladoleda", en: "Scoop of ice cream" },
+      cena: 90,
+    },
+  ],
+};
 
 // Konstante za procenu vremena pripreme - lako se štimuju kasnije
 const MNOZIOCI_GUZVE = [
@@ -1006,28 +1042,35 @@ export default function Home() {
             </div>
 
             <div className="space-y-2.5">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                {t.premiumExtras}
-              </span>
-              {DODACI_MENI.map((dodatak) => {
-                const jeIzabran = izabraniDodaci.some(
-                  (d) => d.id === dodatak.id,
-                );
-                return (
-                  <button
-                    key={dodatak.id}
-                    onClick={() => hendlajDodatak(dodatak)}
-                    className={`w-full flex justify-between items-center p-3 rounded-xl border text-sm font-bold transition-all ${
-                      jeIzabran
-                        ? "bg-slate-900 border-slate-900 text-white"
-                        : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
-                    }`}
-                  >
-                    <span>{dodatak.naziv[jezik]}</span>
-                    <span>+{dodatak.cena} RSD</span>
-                  </button>
-                );
-              })}
+              {(DODACI_PO_KATEGORIJI[otvorenPanelJelo.kategorija] || [])
+                .length > 0 && (
+                <>
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    {t.premiumExtras}
+                  </span>
+                  {DODACI_PO_KATEGORIJI[otvorenPanelJelo.kategorija].map(
+                    (dodatak) => {
+                      const jeIzabran = izabraniDodaci.some(
+                        (d) => d.id === dodatak.id,
+                      );
+                      return (
+                        <button
+                          key={dodatak.id}
+                          onClick={() => hendlajDodatak(dodatak)}
+                          className={`w-full flex justify-between items-center p-3 rounded-xl border text-sm font-bold transition-all ${
+                            jeIzabran
+                              ? "bg-slate-900 border-slate-900 text-white"
+                              : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                          }`}
+                        >
+                          <span>{dodatak.naziv[jezik]}</span>
+                          <span>+{dodatak.cena} RSD</span>
+                        </button>
+                      );
+                    },
+                  )}
+                </>
+              )}
             </div>
 
             <button
