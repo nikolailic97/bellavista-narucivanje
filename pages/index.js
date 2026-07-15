@@ -502,7 +502,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto w-full flex justify-between items-center">
           <div className="relative h-9 w-36">
             <Image
-              src={`${BASE_PATH}/images/logo.png`}
+              src={`${BASE_PATH}/images/logo.svg`}
               alt={NAZIV_RESTORANA}
               fill
               sizes="144px"
@@ -923,42 +923,42 @@ export default function Home() {
           <div>
             <div className="relative h-8 w-32 mb-2">
               <Image
-                src={`${BASE_PATH}/images/logo.png`}
+                src={`${BASE_PATH}/images/logo.svg`}
                 alt={NAZIV_RESTORANA}
                 fill
                 sizes="128px"
                 className="object-contain object-left"
               />
+              <a
+                href={INSTAGRAM_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Instagram"
+                className="hover:text-slate-800 transition-all"
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                >
+                  <rect x="3" y="3" width="18" height="18" rx="5" />
+                  <circle cx="12" cy="12" r="4" />
+                  <circle
+                    cx="17.5"
+                    cy="6.5"
+                    r="0.6"
+                    fill="currentColor"
+                    stroke="none"
+                  />
+                </svg>
+              </a>
             </div>
             <p className="text-xs">Smederevska Palanka, Srbija</p>
           </div>
           <div className="flex items-center gap-4">
-            <a
-              href={INSTAGRAM_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Instagram"
-              className="hover:text-slate-800 transition-all"
-            >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-              >
-                <rect x="3" y="3" width="18" height="18" rx="5" />
-                <circle cx="12" cy="12" r="4" />
-                <circle
-                  cx="17.5"
-                  cy="6.5"
-                  r="0.6"
-                  fill="currentColor"
-                  stroke="none"
-                />
-              </svg>
-            </a>
             <a
               href={SAJT_ILICODE}
               target="_blank"
