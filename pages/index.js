@@ -25,6 +25,13 @@ const SAJT_ILICODE = "https://ilicodes.com";
 const PRAG_BESPLATNE_DOSTAVE = 1600;
 const CENA_DOSTAVE = 200;
 
+// next/image ne dodaje automatski basePath na ručno unete src putanje kad je
+// output:"export" + images.unoptimized:true (samo _next/next/link to rade
+// automatski) - zato ovde ručno dodajemo prefiks svuda gde referenciramo
+// sliku iz /public foldera. Kad se doda custom domen, NEXT_PUBLIC_BASE_PATH
+// se briše iz workflow-a i ovo automatski postaje prazan string.
+const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
+
 // ============ STATIČNI PODACI (jelovnik se ne čuva u Firestore-u) ============
 const KATEGORIJE = [
   { id: "burgeri", sr: "Burgeri", en: "Burgers" },
@@ -44,7 +51,7 @@ const JELOVNIK = [
     cena: 450,
     kategorija: "burgeri",
     vreme_pripreme: 15,
-    slika_url: "/images/pljeskavica.webp",
+    slika_url: `${BASE_PATH}/images/pljeskavica.webp`,
   },
   {
     id: "2",
@@ -56,7 +63,7 @@ const JELOVNIK = [
     cena: 800,
     kategorija: "pice",
     vreme_pripreme: 25,
-    slika_url: "/images/margarita.webp",
+    slika_url: `${BASE_PATH}/images/margarita.webp`,
   },
   {
     id: "3",
@@ -68,7 +75,7 @@ const JELOVNIK = [
     cena: 650,
     kategorija: "salate",
     vreme_pripreme: 10,
-    slika_url: "/images/cezar-salata.webp",
+    slika_url: `${BASE_PATH}/images/cezar-salata.webp`,
   },
   {
     id: "4",
@@ -80,7 +87,7 @@ const JELOVNIK = [
     cena: 350,
     kategorija: "deserti",
     vreme_pripreme: 8,
-    slika_url: "/images/palacinka.webp",
+    slika_url: `${BASE_PATH}/images/palacinka.webp`,
   },
 ];
 
@@ -495,7 +502,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto w-full flex justify-between items-center">
           <div className="relative h-9 w-36">
             <Image
-              src="/images/logo.png"
+              src={`${BASE_PATH}/images/logo.png`}
               alt={NAZIV_RESTORANA}
               fill
               sizes="144px"
@@ -916,7 +923,7 @@ export default function Home() {
           <div>
             <div className="relative h-8 w-32 mb-2">
               <Image
-                src="/images/logo.png"
+                src={`${BASE_PATH}/images/logo.png`}
                 alt={NAZIV_RESTORANA}
                 fill
                 sizes="128px"
