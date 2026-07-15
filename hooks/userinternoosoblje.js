@@ -20,8 +20,6 @@ import { auth, db } from "../lib/firebase";
 import { KUHINJA_EMAIL, ADMIN_EMAIL, REDOSLED_STATUSA } from "../lib/constants";
 import { danasnjiDatum } from "../lib/pomocne";
 
-const EMAIL_PO_ULOZI = { kuhinja: KUHINJA_EMAIL, admin: ADMIN_EMAIL };
-
 // dozvoljeneUloge: npr. ['kuhinja','admin'] za /kuhinja, ili ['admin'] za /admin
 // porukaZabranjenogPristupa: tekst koji se prikaže ako se uloguje nalog koji nema pristup ovoj strani
 export function useInternoOsoblje(dozvoljeneUloge, porukaZabranjenogPristupa) {
@@ -90,29 +88,23 @@ export function useInternoOsoblje(dozvoljeneUloge, porukaZabranjenogPristupa) {
   }, []);
 
   // ---- Prijava - pravi Firebase Auth, PIN = lozinka (min 6 cifara) ----
-  // Probavamo SAMO emailove uloga dozvoljenih na OVOJ stranici, tim redom
-  // (npr. na /admin se nikad ne pokušava kuhinja nalog, bez obzira na PIN).
   const hendlajLogin = async (e) => {
     e.preventDefault();
     setGreskaPristupa("");
     if (pin.length < 6 || prijavaUToku) return;
     setPrijavaUToku(true);
-    const emailoviZaPokusaj = dozvoljeneUloge
-      .map((u) => EMAIL_PO_ULOZI[u])
-      .filter(Boolean);
-    let uspesnaPrijava = false;
-    for (const email of emailoviZaPokusaj) {
+    try {
+      await signInWithEmailAndPassword(auth, KUHINJA_EMAIL, pin);
+    } catch (greskaKuhinja) {
       try {
-        await signInWithEmailAndPassword(auth, email, pin);
-        uspesnaPrijava = true;
-        break;
-      } catch (greska) {
-        // probaj sledeći dozvoljeni email
+        await signInWithEmailAndPassword(auth, ADMIN_EMAIL, pin);
+      } catch (greskaAdmin) {
+        setGreskaPristupa("Netačan PIN kod!");
       }
+    } finally {
+      setPin("");
+      setPrijavaUToku(false);
     }
-    if (!uspesnaPrijava) setGreskaPristupa("Netačan PIN kod!");
-    setPin("");
-    setPrijavaUToku(false);
   };
 
   const hendlajOdjavu = async () => {
