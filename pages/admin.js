@@ -13,9 +13,9 @@ import {
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { danasnjiDatum } from "../lib/pomocne";
-import { useInternoOsoblje } from "../lib/hooks/userinternoosoblje";
-import KuhinjskaTabla from "../lib/components/KuhinjskaTabla";
-import PinPrijava from "../lib/components/PinPrijava";
+import { useInternoOsoblje } from "../hooks/userinternoosoblje";
+import KuhinjskaTabla from "../components/KuhinjskaTabla";
+import PinPrijava from "../components/PinPrijava";
 
 export default function AdminStranica() {
   const {

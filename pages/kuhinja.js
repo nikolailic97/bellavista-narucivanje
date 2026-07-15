@@ -1,7 +1,7 @@
 import Head from "next/head";
-import { useInternoOsoblje } from "../lib/hooks/userinternoosoblje";
-import KuhinjskaTabla from "../lib/components/KuhinjskaTabla";
-import PinPrijava from "../lib/components/PinPrijava";
+import { useInternoOsoblje } from "../hooks/userinternoosoblje";
+import KuhinjskaTabla from "../components/KuhinjskaTabla";
+import PinPrijava from "../components/PinPrijava";
 
 export default function KuhinjaStranica() {
   const {
