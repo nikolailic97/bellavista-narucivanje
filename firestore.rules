@@ -28,7 +28,7 @@ service cloud.firestore {
     match /status_porudzbine/{broj} {
       allow create: if request.resource.data.status == 'novo'
                     && request.resource.data.keys().hasAll([
-                         'status', 'vreme_kreiranja', 'trajanje_procena_min'
+                         'status', 'datum', 'vreme_kreiranja', 'trajanje_procena_min'
                        ]);
       allow read: if true;
       allow update, delete: if jeOsoblje();
@@ -49,9 +49,3 @@ service cloud.firestore {
     }
   }
 }
-
-// NAPOMENA: validacija cene pri kreiranju porudžbine nije moguća bez Cloud
-// Function-a (svesna odluka, u skladu sa zero-cost arhitekturom). Rules
-// proveravaju samo da status pri kreiranju bude "novo" i da obavezna polja
-// postoje — dovoljno da spreči slučajno/nepotpuno upisane dokumente, ne i
-// zlonamerno menjanje cena (isti nivo poverenja kao i ostatak MVP-a).

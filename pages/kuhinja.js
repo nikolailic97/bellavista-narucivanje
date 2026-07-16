@@ -35,7 +35,7 @@ export default function KuhinjaStranica() {
           </p>
         ) : !imaPristup ? (
           <PinPrijava
-            naslov="Kitchen Display"
+            naslov="Kuhinjska tabla"
             pin={pin}
             setPin={setPin}
             prijavaUToku={prijavaUToku}
@@ -45,14 +45,14 @@ export default function KuhinjaStranica() {
         ) : (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <h1 className="text-lg font-bold text-slate-900">
-                Kitchen Display
+              <h1 className="text-xl font-black text-slate-900">
+                Kuhinjska tabla
               </h1>
               <button
                 onClick={hendlajOdjavu}
-                className="text-xs text-red-500 font-bold"
+                className="text-xs text-red-500 font-bold hover:text-red-600 transition-all"
               >
-                Logout
+                Odjavi se
               </button>
             </div>
             <KuhinjskaTabla

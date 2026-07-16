@@ -21,6 +21,7 @@ import {
 // ============ TODO: ZAMENI KAD DOBIJEMO FINALNI NAZIV/LOGO ============
 const NAZIV_RESTORANA = "Restoran"; // koristi se u title/meta/JSON-LD, logo slika ide preko /images/logo.png
 const INSTAGRAM_URL = "https://instagram.com/"; // TODO: zameni pravim profilom
+const KONTAKT_TELEFON = "+381 60 000 0000"; // TODO: zameni pravim brojem
 const SAJT_ILICODE = "https://ilicodes.com";
 const PRAG_BESPLATNE_DOSTAVE = 1600;
 const CENA_DOSTAVE = 200;
@@ -48,6 +49,11 @@ const JELOVNIK = [
       sr: "Kačkavalj, slaninica, tucana paprika, luk...",
       en: "Cheese, bacon, roasted peppers, onion...",
     },
+    sastojci: {
+      sr: "300g pljeskavica od junećeg mesa, pecivo sa susamom, kačkavalj, slaninica, tucana paprika, crni luk, zelena salata, domaći sos.",
+      en: "300g beef patty, sesame bun, cheese, bacon, roasted peppers, red onion, lettuce, house sauce.",
+    },
+    tagovi: [],
     cena: 450,
     kategorija: "burgeri",
     vreme_pripreme: 15,
@@ -60,6 +66,11 @@ const JELOVNIK = [
       sr: "Pelat, kačkavalj, masline, origano...",
       en: "Tomato sauce, cheese, olives, oregano...",
     },
+    sastojci: {
+      sr: "Domaće testo, pelat sos od paradajza, kačkavalj, masline, sveži bosiljak, origano, maslinovo ulje.",
+      en: "House dough, tomato sauce, cheese, olives, fresh basil, oregano, olive oil.",
+    },
+    tagovi: ["vegetarijansko"],
     cena: 800,
     kategorija: "pice",
     vreme_pripreme: 25,
@@ -72,6 +83,11 @@ const JELOVNIK = [
       sr: "Piletina, krutoni, cezar dresing...",
       en: "Chicken, croutons, caesar dressing...",
     },
+    sastojci: {
+      sr: "Piletina na žaru, listovi rimske salate, krutoni, parmezan, cezar dresing.",
+      en: "Grilled chicken, romaine lettuce, croutons, parmesan, caesar dressing.",
+    },
+    tagovi: [],
     cena: 650,
     kategorija: "salate",
     vreme_pripreme: 10,
@@ -84,6 +100,11 @@ const JELOVNIK = [
       sr: "Nutela, plazma, šlag...",
       en: "Nutella, biscuit crumbs, whipped cream...",
     },
+    sastojci: {
+      sr: "Tanka palačinka, čokoladni krem, mrvice plazma keksa, šlag, listić nane.",
+      en: "Thin pancake, chocolate spread, crushed biscuits, whipped cream, mint leaf.",
+    },
+    tagovi: ["vegetarijansko"],
     cena: 350,
     kategorija: "deserti",
     vreme_pripreme: 8,
@@ -301,6 +322,19 @@ const DODACI_PO_KATEGORIJI = {
   ],
 };
 
+// Tagovi na stavkama menija (npr. zeleni "VEGAN" u desnom uglu kartice).
+// Dodaj "tagovi: ['vegan']" (ili koji god ključ) na stavku u JELOVNIK-u.
+const TAGOVI_INFO = {
+  vegan: { sr: "Vegan", en: "Vegan", boja: "bg-emerald-100 text-emerald-700" },
+  vegetarijansko: {
+    sr: "Vegetarijansko",
+    en: "Vegetarian",
+    boja: "bg-emerald-100 text-emerald-700",
+  },
+  ljuto: { sr: "Ljuto", en: "Spicy", boja: "bg-red-100 text-red-600" },
+  novo: { sr: "Novo", en: "New", boja: "bg-amber-100 text-amber-700" },
+};
+
 // Konstante za procenu vremena pripreme - lako se štimuju kasnije
 const MNOZIOCI_GUZVE = [
   { doAktivnih: 5, mnozilac: 1 },
@@ -313,19 +347,22 @@ function izracunajMnozilacGuzve(brojAktivnih) {
   return stepenik ? stepenik.mnozilac : 1;
 }
 
-// Status tekst za KUPCA - prati jezik toggle
+// Status tekst za KUPCA - prati jezik toggle. Interno "zavrseno" znači da je
+// kuhinja gotova i porudžbina je predata dostavljaču - kupcu to prikazujemo
+// kao "Dostava u toku", ne "Završeno" (zbunjivalo je kupce da misle da je
+// porudžbina stigla kad zapravo tek kreće dostava).
 const PREVOD_STATUSA = {
   sr: {
     novo: "Primljena",
     u_pripremi: "U pripremi",
     spremno_za_dostavu: "Spremno za dostavu",
-    zavrseno: "Završeno",
+    zavrseno: "Dostava u toku",
   },
   en: {
     novo: "Received",
     u_pripremi: "In preparation",
     spremno_za_dostavu: "Ready for delivery",
-    zavrseno: "Completed",
+    zavrseno: "Out for delivery",
   },
 };
 
@@ -345,7 +382,6 @@ const PREVODI = {
     noOrders: "Trenutno nemaš aktivnih porudžbina.",
     orderId: "Kod tvoje porudžbine",
     statusLabel: "Trenutni status",
-    refreshBtn: "Osveži status porudžbine",
     premiumExtras: "Izaberi dodatke:",
     addToCart: "Dodaj u korpu",
     menuTab: "Meni",
@@ -360,6 +396,7 @@ const PREVODI = {
     trackCodePlaceholder: "npr. 48213",
     trackCodeBtn: "Prati",
     orLastOrder: "ili tvoja poslednja porudžbina:",
+    orderNotFound: "Porudžbina sa ovim kodom ne postoji:",
   },
   en: {
     cart: "Your Cart",
@@ -376,7 +413,6 @@ const PREVODI = {
     noOrders: "No active orders found.",
     orderId: "Your Order ID",
     statusLabel: "Status",
-    refreshBtn: "Refresh Status",
     premiumExtras: "Choose extras:",
     addToCart: "Add to Cart",
     menuTab: "Menu",
@@ -391,6 +427,7 @@ const PREVODI = {
     trackCodePlaceholder: "e.g. 48213",
     trackCodeBtn: "Track",
     orLastOrder: "or your last order:",
+    orderNotFound: "No order found with this code:",
   },
 };
 
@@ -438,8 +475,10 @@ function IkonicaPrati({ aktivna }) {
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 7v5l3.5 2" />
+      <rect x="1" y="6" width="14" height="10" />
+      <path d="M15 10h4l3 3v3h-7z" />
+      <circle cx="6" cy="19" r="2" />
+      <circle cx="17.5" cy="19" r="2" />
     </svg>
   );
 }
@@ -455,6 +494,7 @@ export default function Home() {
   const [aktivniIdPorudzbine, setAktivniIdPorudzbine] = useState("");
   const [unetiKod, setUnetiKod] = useState("");
   const [statusPorudzbine, setStatusPorudzbine] = useState(null);
+  const [porudzbinaNijeNadjena, setPorudzbinaNijeNadjena] = useState(false);
   const [preostaloVreme, setPreostaloVreme] = useState(0); // interno rate-limitovanje, NE prikazuje se korisniku
   const [preostaloCekanjeSek, setPreostaloCekanjeSek] = useState(null);
   const [slanjeUToku, setSlanjeUToku] = useState(false);
@@ -564,8 +604,11 @@ export default function Home() {
     const bazno = Math.max(...korpa.map((item) => item.vreme_pripreme || 15));
     let mnozilac = 1;
     try {
+      // Gost nema pravo čitanja "porudzbine" (štiti ime/telefon/adresu ostalih
+      // kupaca) - zato brojimo preko javne "status_porudzbine" kolekcije, koja
+      // ima samo status/vreme, bez ličnih podataka.
       const q = query(
-        collection(db, "porudzbine"),
+        collection(db, "status_porudzbine"),
         where("datum", "==", danasnjiDatum()),
         where("status", "in", ["novo", "u_pripremi"]),
       );
@@ -618,6 +661,7 @@ export default function Home() {
         });
         tx.set(statusRef, {
           status: "novo",
+          datum: danasnjiDatum(),
           vreme_kreiranja: serverTimestamp(),
           trajanje_procena_min: trajanjeProcena,
         });
@@ -637,9 +681,8 @@ export default function Home() {
     }
   };
 
-  // ---- Osvežavanje statusa - i dalje interno limitirano na 180s, ali ovo se
-  // NIKAD ne pokazuje korisniku (dugme uvek izgleda isto, klik u međuvremenu
-  // se samo tiho ignoriše da zaštitimo Firestore troškove) ----
+  // ---- Osvežavanje statusa - i dalje interno limitirano na 180s (štiti
+  // Firestore troškove), ali se to nikad ne pokazuje korisniku ----
   const osveziStatusPorudzbine = async (kod) => {
     const ciljniKod = kod || aktivniIdPorudzbine;
     if (!ciljniKod || preostaloVreme > 0 || osvezavanjeUToku) return;
@@ -648,11 +691,12 @@ export default function Home() {
       const snap = await getDoc(doc(db, "status_porudzbine", ciljniKod));
       if (snap.exists()) {
         setStatusPorudzbine(snap.data());
+        setPorudzbinaNijeNadjena(false);
       } else {
         setStatusPorudzbine(null);
+        setPorudzbinaNijeNadjena(true);
         if (ciljniKod === aktivniIdPorudzbine) {
           localStorage.removeItem("id_porudzbine");
-          setAktivniIdPorudzbine("");
         }
       }
       setPreostaloVreme(180);
@@ -666,11 +710,15 @@ export default function Home() {
   const hendlajPracenjeKoda = (e) => {
     e.preventDefault();
     if (!unetiKod || osvezavanjeUToku) return;
-    setPreostaloVreme(0); // nov kod = dozvoli odmah prvu proveru
+    const kod = unetiKod;
+    const noviKod = kod !== aktivniIdPorudzbine;
+    if (noviKod) setPreostaloVreme(0); // nov kod = dozvoli odmah prvu proveru
     setStatusPorudzbine(null);
-    localStorage.setItem("id_porudzbine", unetiKod);
-    setAktivniIdPorudzbine(unetiKod);
+    setPorudzbinaNijeNadjena(false);
+    localStorage.setItem("id_porudzbine", kod);
+    setAktivniIdPorudzbine(kod);
     setUnetiKod("");
+    osveziStatusPorudzbine(kod); // odmah prikaži - ne čekaj poseban klik na "osveži"
   };
 
   return (
@@ -691,6 +739,7 @@ export default function Home() {
               name: NAZIV_RESTORANA,
               servesCuisine: "Balkan",
               priceRange: "$$",
+              telephone: KONTAKT_TELEFON,
               areaServed: [
                 { "@type": "City", name: "Smederevska Palanka" },
                 { "@type": "City", name: "Velika Plana" },
@@ -773,8 +822,16 @@ export default function Home() {
               ).map((jelo) => (
                 <div
                   key={jelo.id}
-                  className="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3"
+                  onClick={() => otvoriDodatke(jelo)}
+                  className="relative bg-white p-3 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3 cursor-pointer hover:border-slate-200 transition-all"
                 >
+                  {jelo.tagovi && jelo.tagovi.length > 0 && (
+                    <span
+                      className={`absolute top-2 right-2 text-[9px] font-bold uppercase px-2 py-0.5 rounded-full ${TAGOVI_INFO[jelo.tagovi[0]].boja}`}
+                    >
+                      {TAGOVI_INFO[jelo.tagovi[0]][jezik]}
+                    </span>
+                  )}
                   <div className="relative w-20 h-20 flex-shrink-0 rounded-xl overflow-hidden bg-slate-100">
                     <Image
                       src={jelo.slika_url}
@@ -796,7 +853,10 @@ export default function Home() {
                     </p>
                   </div>
                   <button
-                    onClick={() => otvoriDodatke(jelo)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      otvoriDodatke(jelo);
+                    }}
                     aria-label={`${t.addToCart} ${jelo.naziv[jezik]}`}
                     className="bg-slate-900 text-white w-9 h-9 rounded-xl flex items-center justify-center font-bold shadow-md flex-shrink-0"
                   >
@@ -970,6 +1030,15 @@ export default function Home() {
 
             {!aktivniIdPorudzbine ? (
               <p className="text-slate-500 text-sm py-8">{t.noOrders}</p>
+            ) : porudzbinaNijeNadjena ? (
+              <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                <p className="text-sm text-slate-500">
+                  {t.orderNotFound}{" "}
+                  <span className="font-bold text-slate-900">
+                    #{aktivniIdPorudzbine}
+                  </span>
+                </p>
+              </div>
             ) : (
               <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-5">
                 <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">
@@ -1004,15 +1073,6 @@ export default function Home() {
                     </span>
                   </div>
                 )}
-
-                {/* Dugme UVEK izgleda isto - interni 180s cooldown se ne otkriva korisniku */}
-                <button
-                  onClick={() => osveziStatusPorudzbine()}
-                  className="w-full font-bold text-sm p-3.5 rounded-xl shadow-sm transition-all bg-slate-900 text-white hover:bg-slate-800"
-                  aria-label={t.refreshBtn}
-                >
-                  {osvezavanjeUToku ? "..." : t.refreshBtn}
-                </button>
               </div>
             )}
           </main>
@@ -1028,10 +1088,25 @@ export default function Home() {
             className="bg-white w-full max-w-md md:rounded-3xl rounded-t-3xl p-5 space-y-4 shadow-2xl animate-fade-in-up"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-black text-slate-900">
-                {otvorenPanelJelo.naziv[jezik]}
-              </h3>
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="text-lg font-black text-slate-900">
+                  {otvorenPanelJelo.naziv[jezik]}
+                </h3>
+                {otvorenPanelJelo.tagovi &&
+                  otvorenPanelJelo.tagovi.length > 0 && (
+                    <div className="flex gap-1.5 mt-1.5">
+                      {otvorenPanelJelo.tagovi.map((tag) => (
+                        <span
+                          key={tag}
+                          className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-full ${TAGOVI_INFO[tag].boja}`}
+                        >
+                          {TAGOVI_INFO[tag][jezik]}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+              </div>
               <button
                 onClick={() => setOtvorenPanelJelo(null)}
                 className="text-slate-500 hover:text-slate-600 font-bold text-xl p-1"
@@ -1040,6 +1115,12 @@ export default function Home() {
                 ✕
               </button>
             </div>
+
+            {otvorenPanelJelo.sastojci && (
+              <p className="text-sm text-slate-600 leading-relaxed -mt-1">
+                {otvorenPanelJelo.sastojci[jezik]}
+              </p>
+            )}
 
             <div className="space-y-2.5">
               {(DODACI_PO_KATEGORIJI[otvorenPanelJelo.kategorija] || [])
@@ -1128,16 +1209,18 @@ export default function Home() {
 
       {/* Footer - vidljiv na desktopu (scroll), na mobilnom je iznad fiksnog nav-a */}
       <footer className="hidden md:block bg-white border-t border-slate-100 mt-8">
-        <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col sm:flex-row justify-between gap-6 text-sm text-slate-500">
+        <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 text-sm text-slate-500">
           <div>
-            <div className="relative h-8 w-32 mb-2">
-              <Image
-                src={`${BASE_PATH}/images/logo.svg`}
-                alt={NAZIV_RESTORANA}
-                fill
-                sizes="128px"
-                className="object-contain object-left"
-              />
+            <div className="flex items-center gap-3 mb-2">
+              <div className="relative h-9 w-9 flex-shrink-0">
+                <Image
+                  src={`${BASE_PATH}/images/logo.svg`}
+                  alt={NAZIV_RESTORANA}
+                  fill
+                  sizes="36px"
+                  className="object-contain"
+                />
+              </div>
               <a
                 href={INSTAGRAM_URL}
                 target="_blank"
@@ -1166,17 +1249,21 @@ export default function Home() {
               </a>
             </div>
             <p className="text-xs">Smederevska Palanka, Srbija</p>
-          </div>
-          <div className="flex items-center gap-4">
             <a
-              href={SAJT_ILICODE}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs hover:text-slate-800 transition-all"
+              href={`tel:${KONTAKT_TELEFON.replace(/\s/g, "")}`}
+              className="text-xs block mt-0.5 hover:text-slate-800 transition-all"
             >
-              created by <span className="font-bold">Ilicode Studio</span>
+              {KONTAKT_TELEFON}
             </a>
           </div>
+          <a
+            href={SAJT_ILICODE}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs hover:text-slate-800 transition-all"
+          >
+            created by <span className="font-bold">Ilicode Studio</span>
+          </a>
         </div>
       </footer>
     </div>

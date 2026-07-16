@@ -67,6 +67,11 @@ export default function KuhinjskaTabla({
                     </li>
                   ))}
                 </ul>
+                <div className="text-xs text-slate-600 bg-slate-50 rounded-lg p-2.5 mb-3 space-y-0.5">
+                  <p className="font-bold text-slate-800">{p.ime}</p>
+                  <p>{p.telefon}</p>
+                  <p>{p.adresa}</p>
+                </div>
                 {NAZIV_SLEDECE_AKCIJE[p.status] && (
                   <button
                     onClick={() => naNapredujStatus(p)}

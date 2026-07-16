@@ -8,6 +8,19 @@
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "vreme_kreiranja", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "status_porudzbine",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "datum", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "izvestaji",
+      "queryScope": "COLLECTION",
+      "fields": [{ "fieldPath": "__name__", "order": "DESCENDING" }]
     }
   ],
   "fieldOverrides": []
