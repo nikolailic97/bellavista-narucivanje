@@ -2,7 +2,13 @@ import { useState } from "react";
 import { NAZIV_STATUSA, NAZIV_SLEDECE_AKCIJE } from "../lib/constants";
 import { jeliKasni } from "../lib/pomocne";
 
-function PorudzbinaKartica({ p, kasni, naNapredujStatus, naAzurirajVreme }) {
+function PorudzbinaKartica({
+  p,
+  kasni,
+  naNapredujStatus,
+  naAzurirajVreme,
+  mozeMenjatiVreme,
+}) {
   const [vreme, setVreme] = useState(String(p.trajanje_procena_min || ""));
   const [cuvanjeUToku, setCuvanjeUToku] = useState(false);
 
@@ -26,15 +32,15 @@ function PorudzbinaKartica({ p, kasni, naNapredujStatus, naAzurirajVreme }) {
       className={`rounded-xl overflow-hidden shadow-sm border-2 ${bojaTema.okvir}`}
     >
       <div
-        className={`${bojaTema.banner} text-white text-center text-[10px] uppercase font-bold py-1.5 tracking-wide`}
+        className={`${bojaTema.banner} text-white text-center text-xs uppercase font-bold py-2 tracking-wide`}
       >
         {kasni ? "Kasni" : NAZIV_STATUSA[p.status]}
       </div>
       <div className="bg-white p-4">
-        <span className="font-black text-lg text-slate-900 block mb-2">
+        <span className="font-black text-2xl text-slate-900 block mb-2">
           #{p.broj}
         </span>
-        <ul className="text-sm text-slate-700 space-y-1 mb-3">
+        <ul className="text-base text-slate-700 space-y-1.5 mb-3 font-medium">
           {(p.stavke || []).map((stavka, i) => (
             <li key={i}>
               {stavka.kolicina}x {stavka.naziv}
@@ -47,37 +53,46 @@ function PorudzbinaKartica({ p, kasni, naNapredujStatus, naAzurirajVreme }) {
             </li>
           ))}
         </ul>
-        <div className="text-xs text-slate-600 bg-slate-50 rounded-lg p-2.5 mb-3 space-y-0.5">
-          <p className="font-bold text-slate-800">{p.ime}</p>
+        <div className="text-sm text-slate-700 bg-slate-50 rounded-lg p-3 mb-3 space-y-1">
+          <p className="font-bold text-slate-900 text-base">{p.ime}</p>
           <p>{p.telefon}</p>
           <p>{p.adresa}</p>
         </div>
 
-        {/* Ručna izmena procenjenog vremena - npr. gužva u restoranu utiče
-            na dostavu, pa se vreme koje vidi kupac može ručno prilagoditi */}
-        <div className="flex items-center gap-2 mb-3">
-          <input
-            type="number"
-            min="1"
-            value={vreme}
-            onChange={(e) => setVreme(e.target.value)}
-            className="w-16 border border-slate-200 rounded-lg p-1.5 text-center text-sm font-bold"
-            aria-label={`Procenjeno vreme za porudžbinu ${p.broj} (minuti)`}
-          />
-          <span className="text-xs text-slate-500">min</span>
-          <button
-            onClick={sacuvajVreme}
-            disabled={cuvanjeUToku}
-            className="ml-auto text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 px-3 py-1.5 rounded-lg transition-all"
-          >
-            {cuvanjeUToku ? "..." : "Sačuvaj vreme"}
-          </button>
-        </div>
+        {/* Procenjeno vreme - konobar/admin mogu da ga menjaju (npr. gužva u
+            restoranu utiče na dostavu), kuhinja samo gleda prikazanu vrednost */}
+        {mozeMenjatiVreme ? (
+          <div className="flex items-center gap-2 mb-3">
+            <input
+              type="number"
+              min="1"
+              value={vreme}
+              onChange={(e) => setVreme(e.target.value)}
+              className="w-16 border border-slate-200 rounded-lg p-1.5 text-center text-base font-bold"
+              aria-label={`Procenjeno vreme za porudžbinu ${p.broj} (minuti)`}
+            />
+            <span className="text-sm text-slate-500">min</span>
+            <button
+              onClick={sacuvajVreme}
+              disabled={cuvanjeUToku}
+              className="ml-auto text-sm font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 px-3 py-1.5 rounded-lg transition-all"
+            >
+              {cuvanjeUToku ? "..." : "Sačuvaj vreme"}
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 mb-3 text-sm text-slate-600">
+            <span>Procenjeno vreme:</span>
+            <span className="font-bold text-slate-900">
+              {p.trajanje_procena_min ? `${p.trajanje_procena_min} min` : "—"}
+            </span>
+          </div>
+        )}
 
         {NAZIV_SLEDECE_AKCIJE[p.status] && (
           <button
             onClick={() => naNapredujStatus(p)}
-            className={`w-full text-white font-bold text-xs py-2.5 rounded-lg transition-all ${
+            className={`w-full text-white font-bold text-sm py-3 rounded-lg transition-all ${
               kasni
                 ? "bg-red-600 hover:bg-red-700"
                 : "bg-slate-900 hover:bg-slate-800"
@@ -99,6 +114,7 @@ export default function KuhinjskaTabla({
   naAzurirajVreme,
   naZatvoriDan,
   zatvaranjeUToku,
+  mozeMenjatiVreme = false,
 }) {
   return (
     <div className="space-y-4">
@@ -106,7 +122,7 @@ export default function KuhinjskaTabla({
         <button
           onClick={naZatvoriDan}
           disabled={zatvaranjeUToku}
-          className="bg-amber-600 disabled:bg-slate-300 text-white font-bold text-xs px-4 py-2 rounded-lg shadow-sm hover:bg-amber-700 transition-all"
+          className="bg-amber-600 disabled:bg-slate-300 text-white font-bold text-sm px-4 py-2.5 rounded-lg shadow-sm hover:bg-amber-700 transition-all"
           aria-label="Zatvori poslovni dan i arhiviraj porudžbine"
         >
           {zatvaranjeUToku
@@ -128,6 +144,7 @@ export default function KuhinjskaTabla({
               kasni={jeliKasni(p, sadaTick)}
               naNapredujStatus={naNapredujStatus}
               naAzurirajVreme={naAzurirajVreme}
+              mozeMenjatiVreme={mozeMenjatiVreme}
             />
           ))}
         </div>

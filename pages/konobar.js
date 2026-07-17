@@ -1,5 +1,5 @@
 import Head from "next/head";
-import { useInternoOsoblje } from "../hooks/userinternoosoblje";
+import { useInternoOsoblje } from "../hooks/useInternoOsoblje";
 import KuhinjskaTabla from "../components/KuhinjskaTabla";
 import PinPrijava from "../components/PinPrijava";
 
@@ -68,6 +68,7 @@ export default function KonobarStranica() {
               naAzurirajVreme={azurirajVreme}
               naZatvoriDan={zatvoriPoslovniDan}
               zatvaranjeUToku={zatvaranjeUToku}
+              mozeMenjatiVreme
             />
           </div>
         )}

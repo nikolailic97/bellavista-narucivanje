@@ -1,5 +1,5 @@
 import Head from "next/head";
-import { useInternoOsoblje } from "../hooks/userinternoosoblje";
+import { useInternoOsoblje } from "../hooks/useInternoOsoblje";
 import KuhinjskaTabla from "../components/KuhinjskaTabla";
 import PinPrijava from "../components/PinPrijava";
 
@@ -18,7 +18,6 @@ export default function KuhinjaStranica() {
     porudzbine,
     sadaTick,
     napredujStatus,
-    azurirajVreme,
     zatvoriPoslovniDan,
     zatvaranjeUToku,
   } = useInternoOsoblje(["kuhinja", "admin"]);
@@ -64,7 +63,6 @@ export default function KuhinjaStranica() {
               porudzbine={porudzbine}
               sadaTick={sadaTick}
               naNapredujStatus={napredujStatus}
-              naAzurirajVreme={azurirajVreme}
               naZatvoriDan={zatvoriPoslovniDan}
               zatvaranjeUToku={zatvaranjeUToku}
             />

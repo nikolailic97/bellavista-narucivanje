@@ -14,7 +14,7 @@ import {
 import { db } from "../lib/firebase";
 import { danasnjiDatum } from "../lib/pomocne";
 import { NAZIV_STATUSA } from "../lib/constants";
-import { useInternoOsoblje } from "../hooks/userinternoosoblje";
+import { useInternoOsoblje } from "../hooks/useInternoOsoblje";
 import KuhinjskaTabla from "../components/KuhinjskaTabla";
 import PinPrijava from "../components/PinPrijava";
 
@@ -209,6 +209,7 @@ export default function AdminStranica() {
                 naAzurirajVreme={azurirajVreme}
                 naZatvoriDan={zatvoriPoslovniDan}
                 zatvaranjeUToku={zatvaranjeUToku}
+                mozeMenjatiVreme
               />
             )}
 
