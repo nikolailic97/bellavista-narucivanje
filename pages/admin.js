@@ -33,6 +33,7 @@ export default function AdminStranica() {
     porudzbine,
     sadaTick,
     napredujStatus,
+    azurirajVreme,
     zatvoriPoslovniDan,
     zatvaranjeUToku,
   } = useInternoOsoblje(
@@ -205,6 +206,7 @@ export default function AdminStranica() {
                 porudzbine={porudzbine}
                 sadaTick={sadaTick}
                 naNapredujStatus={napredujStatus}
+                naAzurirajVreme={azurirajVreme}
                 naZatvoriDan={zatvoriPoslovniDan}
                 zatvaranjeUToku={zatvaranjeUToku}
               />

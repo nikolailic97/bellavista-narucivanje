@@ -3,7 +3,7 @@ import { useInternoOsoblje } from "../hooks/userinternoosoblje";
 import KuhinjskaTabla from "../components/KuhinjskaTabla";
 import PinPrijava from "../components/PinPrijava";
 
-export default function KuhinjaStranica() {
+export default function KonobarStranica() {
   const {
     ucitavanjeUloge,
     imaPristup,
@@ -21,12 +21,15 @@ export default function KuhinjaStranica() {
     azurirajVreme,
     zatvoriPoslovniDan,
     zatvaranjeUToku,
-  } = useInternoOsoblje(["kuhinja", "admin"]);
+  } = useInternoOsoblje(
+    ["konobar", "admin"],
+    "Ovaj nalog nema pristup ovoj stranici — probaj /kuhinja.",
+  );
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans antialiased text-slate-800">
       <Head>
-        <title>Kuhinja — Interni panel</title>
+        <title>Konobar — Interni panel</title>
         <meta name="robots" content="noindex, nofollow" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
@@ -38,7 +41,7 @@ export default function KuhinjaStranica() {
           </p>
         ) : !imaPristup ? (
           <PinPrijava
-            naslov="Kuhinjska tabla"
+            naslov="Konobar"
             email={email}
             setEmail={setEmail}
             pin={pin}
@@ -50,9 +53,7 @@ export default function KuhinjaStranica() {
         ) : (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <h1 className="text-xl font-black text-slate-900">
-                Kuhinjska tabla
-              </h1>
+              <h1 className="text-xl font-black text-slate-900">Konobar</h1>
               <button
                 onClick={hendlajOdjavu}
                 className="text-xs text-red-500 font-bold hover:text-red-600 transition-all"

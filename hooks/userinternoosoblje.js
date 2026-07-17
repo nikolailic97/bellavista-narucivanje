@@ -127,6 +127,30 @@ export function useInternoOsoblje(dozvoljeneUloge, porukaZabranjenogPristupa) {
     }
   };
 
+  // ---- Ručna izmena procenjenog vremena pripreme (npr. konobar zna da je
+  // gužva u restoranu pa produžava vreme) - oba dokumenta u istom batch-u,
+  // kupac vidi novo vreme sledeći put kad proveri "Prati" ----
+  const azurirajVreme = async (porudzbina, novoVremeMin) => {
+    const broj = Number(novoVremeMin);
+    if (!broj || broj <= 0) {
+      alert("Unesi ispravan broj minuta.");
+      return;
+    }
+    try {
+      const batch = writeBatch(db);
+      batch.update(doc(db, "porudzbine", porudzbina.id), {
+        trajanje_procena_min: broj,
+      });
+      batch.update(doc(db, "status_porudzbine", porudzbina.broj), {
+        trajanje_procena_min: broj,
+      });
+      await batch.commit();
+    } catch (greska) {
+      console.error("Greška pri izmeni vremena:", greska);
+      alert("Nije uspelo ažuriranje vremena, pokušaj ponovo.");
+    }
+  };
+
   // ---- Zatvaranje poslovnog dana: agregacija + arhiviranje + batch brisanje (≤500 po paketu) ----
   const zatvoriPoslovniDan = async () => {
     if (zatvaranjeUToku) return;
@@ -214,6 +238,7 @@ export function useInternoOsoblje(dozvoljeneUloge, porukaZabranjenogPristupa) {
     porudzbine,
     sadaTick,
     napredujStatus,
+    azurirajVreme,
     zatvoriPoslovniDan,
     zatvaranjeUToku,
   };

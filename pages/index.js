@@ -322,17 +322,42 @@ const DODACI_PO_KATEGORIJI = {
   ],
 };
 
-// Tagovi na stavkama menija (npr. zeleni "VEGAN" u desnom uglu kartice).
-// Dodaj "tagovi: ['vegan']" (ili koji god ključ) na stavku u JELOVNIK-u.
+// Tagovi na stavkama menija (npr. zeleni "VEGAN" plutajući preko slike).
+// Dodaj "tagovi: ['vegan', 'sadrzi_orasaste']" (koliko god ključeva) na
+// stavku u JELOVNIK-u.
 const TAGOVI_INFO = {
+  // Ishrana - zelene nijanse
   vegan: { sr: "Vegan", en: "Vegan", boja: "bg-emerald-100 text-emerald-700" },
   vegetarijansko: {
     sr: "Vegetarijansko",
     en: "Vegetarian",
-    boja: "bg-emerald-100 text-emerald-700",
+    boja: "bg-green-100 text-green-700",
   },
+  bez_glutena: {
+    sr: "Bez glutena",
+    en: "Gluten-free",
+    boja: "bg-sky-100 text-sky-700",
+  },
+  // Ukus - toplo/crveno
   ljuto: { sr: "Ljuto", en: "Spicy", boja: "bg-red-100 text-red-600" },
+  // Alergeni - upozorenje, žuto/narandžasto
+  sadrzi_orasaste: {
+    sr: "Sadrži orašaste plodove",
+    en: "Contains nuts",
+    boja: "bg-orange-100 text-orange-700",
+  },
+  sadrzi_laktozu: {
+    sr: "Sadrži laktozu",
+    en: "Contains lactose",
+    boja: "bg-yellow-100 text-yellow-700",
+  },
+  // Marketing - amber/pink
   novo: { sr: "Novo", en: "New", boja: "bg-amber-100 text-amber-700" },
+  popularno: {
+    sr: "Popularno",
+    en: "Popular",
+    boja: "bg-pink-100 text-pink-700",
+  },
 };
 
 // Konstante za procenu vremena pripreme - lako se štimuju kasnije
@@ -816,53 +841,57 @@ export default function Home() {
               {t.freeDeliveryFrom}
             </p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 gap-y-5 mt-2">
               {JELOVNIK.filter(
                 (j) => j.kategorija === selektovanaKategorija,
               ).map((jelo) => (
-                <div key={jelo.id} className="flex flex-col">
+                <div
+                  key={jelo.id}
+                  onClick={() => otvoriDodatke(jelo)}
+                  className="relative bg-white p-3 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3 cursor-pointer hover:border-slate-200 transition-all"
+                >
                   {jelo.tagovi && jelo.tagovi.length > 0 && (
-                    <span
-                      className={`self-start mb-1.5 ml-1 text-[9px] font-bold uppercase px-2 py-0.5 rounded-full ${TAGOVI_INFO[jelo.tagovi[0]].boja}`}
-                    >
-                      {TAGOVI_INFO[jelo.tagovi[0]][jezik]}
-                    </span>
+                    <div className="absolute -top-2.5 left-3 flex gap-1 z-10">
+                      {jelo.tagovi.map((tag) => (
+                        <span
+                          key={tag}
+                          className={`text-[9px] font-bold uppercase px-2 py-1 rounded-full shadow-md whitespace-nowrap ${TAGOVI_INFO[tag].boja}`}
+                        >
+                          {TAGOVI_INFO[tag][jezik]}
+                        </span>
+                      ))}
+                    </div>
                   )}
-                  <div
-                    onClick={() => otvoriDodatke(jelo)}
-                    className="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3 cursor-pointer hover:border-slate-200 transition-all"
-                  >
-                    <div className="relative w-20 h-20 flex-shrink-0 rounded-xl overflow-hidden bg-slate-100">
-                      <Image
-                        src={jelo.slika_url}
-                        alt={jelo.naziv[jezik]}
-                        fill
-                        sizes="80px"
-                        className="object-cover"
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-slate-900 text-base truncate">
-                        {jelo.naziv[jezik]}
-                      </h3>
-                      <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">
-                        {jelo.opis[jezik]}
-                      </p>
-                      <p className="font-extrabold text-slate-900 mt-2">
-                        {jelo.cena} RSD
-                      </p>
-                    </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        otvoriDodatke(jelo);
-                      }}
-                      aria-label={`${t.addToCart} ${jelo.naziv[jezik]}`}
-                      className="bg-slate-900 text-white w-9 h-9 rounded-xl flex items-center justify-center font-bold shadow-md flex-shrink-0"
-                    >
-                      +
-                    </button>
+                  <div className="relative w-20 h-20 flex-shrink-0 rounded-xl overflow-hidden bg-slate-100">
+                    <Image
+                      src={jelo.slika_url}
+                      alt={jelo.naziv[jezik]}
+                      fill
+                      sizes="80px"
+                      className="object-cover"
+                    />
                   </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-slate-900 text-base truncate">
+                      {jelo.naziv[jezik]}
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">
+                      {jelo.opis[jezik]}
+                    </p>
+                    <p className="font-extrabold text-slate-900 mt-2">
+                      {jelo.cena} RSD
+                    </p>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      otvoriDodatke(jelo);
+                    }}
+                    aria-label={`${t.addToCart} ${jelo.naziv[jezik]}`}
+                    className="bg-slate-900 text-white w-9 h-9 rounded-xl flex items-center justify-center font-bold shadow-md flex-shrink-0"
+                  >
+                    +
+                  </button>
                 </div>
               ))}
             </div>
