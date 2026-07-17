@@ -15,10 +15,12 @@ import {
   onSnapshot,
   writeBatch,
   serverTimestamp,
+  increment,
 } from "firebase/firestore";
 import { auth, db } from "../lib/firebase";
 import { REDOSLED_STATUSA } from "../lib/constants";
 import { danasnjiDatum } from "../lib/pomocne";
+import { NAZIV_JELA_SR } from "../lib/jelovnik";
 
 // dozvoljeneUloge: npr. ['kuhinja','admin'] za /kuhinja, ili ['admin'] za /admin
 // porukaZabranjenogPristupa: tekst koji se prikaže ako se uloguje nalog koji nema pristup ovoj strani
@@ -151,29 +153,31 @@ export function useInternoOsoblje(dozvoljeneUloge, porukaZabranjenogPristupa) {
     }
   };
 
-  // ---- Zatvaranje poslovnog dana: agregacija + arhiviranje + batch brisanje (≤500 po paketu) ----
+  // ---- Zatvaranje poslovnog dana: agregacija (increment, ne prepisivanje -
+  // sme se pozvati više puta istog dana, npr. ako stignu nove porudžbine
+  // nakon prvog zatvaranja, ništa se ne gubi) + batch brisanje (≤500 po paketu) ----
   const zatvoriPoslovniDan = async () => {
     if (zatvaranjeUToku) return;
     if (
       !window.confirm(
-        "Da li si siguran? Sve današnje porudžbine će biti arhivirane i obrisane.",
+        "Da li si siguran? Sve trenutne porudžbine za danas će biti arhivirane i obrisane.",
       )
     )
       return;
     setZatvaranjeUToku(true);
     try {
-      const statusZatvaranjaRef = doc(db, "izvestaji_status", danasnjiDatum());
-      const postojeciStatusZatvaranja = await getDoc(statusZatvaranjaRef);
-      if (postojeciStatusZatvaranja.exists()) {
-        alert("Poslovni dan je već zatvoren za danas.");
-        return;
-      }
-
       const q = query(
         collection(db, "porudzbine"),
         where("datum", "==", danasnjiDatum()),
       );
       const snap = await getDocs(q);
+
+      if (snap.empty) {
+        alert(
+          "Nema porudžbina za arhiviranje (dan je već zatvoren i nema novih porudžbina od tada).",
+        );
+        return;
+      }
 
       let ukupnoPorudzbina = 0;
       let ukupanPrihod = 0;
@@ -184,23 +188,33 @@ export function useInternoOsoblje(dozvoljeneUloge, porukaZabranjenogPristupa) {
         ukupnoPorudzbina += 1;
         ukupanPrihod += podaci.cena_ukupno || 0;
         (podaci.stavke || []).forEach((stavka) => {
-          najprodavanije[stavka.naziv] =
-            (najprodavanije[stavka.naziv] || 0) + stavka.kolicina;
+          const naziv = NAZIV_JELA_SR[stavka.id_jela] || stavka.naziv;
+          najprodavanije[naziv] =
+            (najprodavanije[naziv] || 0) + stavka.kolicina;
         });
+      });
+
+      // increment() radi i ako polje/dokument još ne postoji (tretira ga kao
+      // 0) - zato ovo bezbedno radi i za prvo I za svako sledeće zatvaranje
+      // istog dana, bez potrebe da se prethodno pročita postojeći izveštaj
+      // (kuhinja nema pravo čitanja izvestaji, samo admin - increment to zaobilazi).
+      const azuriranje = {
+        total_orders: increment(ukupnoPorudzbina),
+        total_revenue: increment(ukupanPrihod),
+        poslednje_azuriranje: serverTimestamp(),
+      };
+      Object.entries(najprodavanije).forEach(([naziv, kolicina]) => {
+        azuriranje[`top_items.${naziv}`] = increment(kolicina);
       });
 
       const izvestajRef = doc(db, "izvestaji", danasnjiDatum());
       const paketIzvestaja = writeBatch(db);
-      paketIzvestaja.set(izvestajRef, {
-        total_orders: ukupnoPorudzbina,
-        total_revenue: ukupanPrihod,
-        top_items: najprodavanije,
-        kreiran: serverTimestamp(),
-      });
-      paketIzvestaja.set(statusZatvaranjaRef, {
-        zatvoren: true,
-        zatvoren_u: serverTimestamp(),
-      });
+      paketIzvestaja.set(izvestajRef, azuriranje, { merge: true });
+      paketIzvestaja.set(
+        doc(db, "izvestaji_status", danasnjiDatum()),
+        { zatvoren: true, zatvoren_u: serverTimestamp() },
+        { merge: true },
+      );
       await paketIzvestaja.commit();
 
       const VELICINA_PAKETA = 250;
@@ -214,7 +228,7 @@ export function useInternoOsoblje(dozvoljeneUloge, porukaZabranjenogPristupa) {
         await paket.commit();
       }
 
-      alert(`Dan zatvoren. Arhivirano ${ukupnoPorudzbina} porudžbina.`);
+      alert(`Arhivirano ${ukupnoPorudzbina} porudžbina.`);
     } catch (greska) {
       console.error("Greška pri zatvaranju poslovnog dana:", greska);
       alert("Došlo je do greške. Pokušaj ponovo.");

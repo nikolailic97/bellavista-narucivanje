@@ -18,6 +18,7 @@ export default function KuhinjaStranica() {
     porudzbine,
     sadaTick,
     napredujStatus,
+    azurirajVreme,
     zatvoriPoslovniDan,
     zatvaranjeUToku,
   } = useInternoOsoblje(["kuhinja", "admin"]);
@@ -63,8 +64,10 @@ export default function KuhinjaStranica() {
               porudzbine={porudzbine}
               sadaTick={sadaTick}
               naNapredujStatus={napredujStatus}
+              naAzurirajVreme={azurirajVreme}
               naZatvoriDan={zatvoriPoslovniDan}
               zatvaranjeUToku={zatvaranjeUToku}
+              mozeMenjatiVreme
             />
           </div>
         )}

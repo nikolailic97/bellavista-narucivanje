@@ -28,7 +28,6 @@ async function postaviUloge() {
 
   await postaviUlogu(auth, "kuhinja@bellavista.rs", "kuhinja");
   await postaviUlogu(auth, "admin@bellavista.rs", "admin");
-  await postaviUlogu(auth, "konobar@bellavista.rs", "konobar");
 
   console.log(
     "\nGotovo. Korisnik mora da se ponovo uloguje (ili sačeka do 1h) da bi claim stupio na snagu.",

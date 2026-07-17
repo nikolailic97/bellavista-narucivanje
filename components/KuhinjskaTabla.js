@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { NAZIV_STATUSA, NAZIV_SLEDECE_AKCIJE } from "../lib/constants";
 import { jeliKasni } from "../lib/pomocne";
+import { NAZIV_JELA_SR, NAZIV_DODATKA_SR } from "../lib/jelovnik";
 
 function PorudzbinaKartica({
   p,
@@ -32,7 +33,7 @@ function PorudzbinaKartica({
       className={`rounded-xl overflow-hidden shadow-sm border-2 ${bojaTema.okvir}`}
     >
       <div
-        className={`${bojaTema.banner} text-white text-center text-xs uppercase font-bold py-2 tracking-wide`}
+        className={`${bojaTema.banner} text-white text-center text-sm uppercase font-bold py-2 tracking-wide`}
       >
         {kasni ? "Kasni" : NAZIV_STATUSA[p.status]}
       </div>
@@ -40,27 +41,42 @@ function PorudzbinaKartica({
         <span className="font-black text-2xl text-slate-900 block mb-2">
           #{p.broj}
         </span>
-        <ul className="text-base text-slate-700 space-y-1.5 mb-3 font-medium">
+        {/* Uvek srpski naziv (preko id_jela/id dodatka), bez obzira na jezik
+            na kom je kupac naručio - kupac vidi svoj jezik, kuhinja uvek srpski */}
+        <ul className="text-lg text-slate-800 space-y-1.5 mb-3 font-semibold">
           {(p.stavke || []).map((stavka, i) => (
             <li key={i}>
-              {stavka.kolicina}x {stavka.naziv}
+              {stavka.kolicina}x {NAZIV_JELA_SR[stavka.id_jela] || stavka.naziv}
               {stavka.dodaci && stavka.dodaci.length > 0 && (
-                <span className="text-slate-500">
+                <span className="text-slate-500 font-medium text-base">
                   {" "}
-                  (+{stavka.dodaci.map((d) => d.naziv).join(", ")})
+                  (+
+                  {stavka.dodaci
+                    .map((d) => NAZIV_DODATKA_SR[d.id] || d.naziv)
+                    .join(", ")}
+                  )
                 </span>
               )}
             </li>
           ))}
         </ul>
-        <div className="text-sm text-slate-700 bg-slate-50 rounded-lg p-3 mb-3 space-y-1">
-          <p className="font-bold text-slate-900 text-base">{p.ime}</p>
-          <p>{p.telefon}</p>
-          <p>{p.adresa}</p>
+        <div className="text-base text-slate-700 bg-slate-50 rounded-lg p-3 mb-3 space-y-1">
+          <p>
+            <span className="text-slate-500">Ime: </span>
+            <span className="font-bold text-slate-900">{p.ime}</span>
+          </p>
+          <p>
+            <span className="text-slate-500">Telefon: </span>
+            <span className="font-bold text-slate-900">{p.telefon}</span>
+          </p>
+          <p>
+            <span className="text-slate-500">Adresa: </span>
+            <span className="font-bold text-slate-900">{p.adresa}</span>
+          </p>
         </div>
 
-        {/* Procenjeno vreme - konobar/admin mogu da ga menjaju (npr. gužva u
-            restoranu utiče na dostavu), kuhinja samo gleda prikazanu vrednost */}
+        {/* Procenjeno vreme - kuhinja/admin mogu da ga menjaju (npr. gužva u
+            restoranu utiče na dostavu) */}
         {mozeMenjatiVreme ? (
           <div className="flex items-center gap-2 mb-3">
             <input
@@ -81,7 +97,7 @@ function PorudzbinaKartica({
             </button>
           </div>
         ) : (
-          <div className="flex items-center gap-1.5 mb-3 text-sm text-slate-600">
+          <div className="flex items-center gap-1.5 mb-3 text-base text-slate-600">
             <span>Procenjeno vreme:</span>
             <span className="font-bold text-slate-900">
               {p.trajanje_procena_min ? `${p.trajanje_procena_min} min` : "—"}
@@ -92,7 +108,7 @@ function PorudzbinaKartica({
         {NAZIV_SLEDECE_AKCIJE[p.status] && (
           <button
             onClick={() => naNapredujStatus(p)}
-            className={`w-full text-white font-bold text-sm py-3 rounded-lg transition-all ${
+            className={`w-full text-white font-bold text-base py-3 rounded-lg transition-all ${
               kasni
                 ? "bg-red-600 hover:bg-red-700"
                 : "bg-slate-900 hover:bg-slate-800"

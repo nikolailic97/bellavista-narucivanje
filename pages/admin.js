@@ -224,7 +224,7 @@ export default function AdminStranica() {
                       setPretragaKod(e.target.value.replace(/\D/g, ""))
                     }
                     placeholder="Broj porudžbine, npr. 48213"
-                    className="flex-1 border border-slate-200 rounded-lg p-2.5 text-sm focus:outline-none focus:border-slate-400"
+                    className="flex-1 border border-slate-200 rounded-lg p-2.5 text-base focus:outline-none focus:border-slate-400"
                     aria-label="Broj porudžbine"
                   />
                   <button

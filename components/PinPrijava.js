@@ -42,7 +42,7 @@ export default function PinPrijava({
           placeholder="Email adresa"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full border border-slate-200 rounded-xl p-3 text-sm text-center focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition-all"
+          className="w-full border border-slate-200 rounded-xl p-3 text-base text-center focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition-all"
           aria-label="Email adresa"
           autoFocus
         />
