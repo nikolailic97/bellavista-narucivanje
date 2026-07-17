@@ -1,5 +1,7 @@
 export default function PinPrijava({
   naslov,
+  email,
+  setEmail,
   pin,
   setPin,
   prijavaUToku,
@@ -31,9 +33,19 @@ export default function PinPrijava({
         <div>
           <h2 className="text-lg font-black text-slate-900">{naslov}</h2>
           <p className="text-xs text-slate-500 mt-1">
-            Unesi svoj PIN kod za pristup
+            Unesi email i PIN kod za pristup
           </p>
         </div>
+
+        <input
+          type="email"
+          placeholder="Email adresa"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="w-full border border-slate-200 rounded-xl p-3 text-sm text-center focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition-all"
+          aria-label="Email adresa"
+          autoFocus
+        />
 
         <input
           type="password"
@@ -44,7 +56,6 @@ export default function PinPrijava({
           onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
           className="w-full border border-slate-200 rounded-xl p-3.5 text-center text-xl tracking-[0.4em] font-bold focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition-all"
           aria-label="PIN kod"
-          autoFocus
         />
 
         {greska && (

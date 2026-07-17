@@ -17,16 +17,15 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { auth, db } from "../lib/firebase";
-import { KUHINJA_EMAIL, ADMIN_EMAIL, REDOSLED_STATUSA } from "../lib/constants";
+import { REDOSLED_STATUSA } from "../lib/constants";
 import { danasnjiDatum } from "../lib/pomocne";
-
-const EMAIL_PO_ULOZI = { kuhinja: KUHINJA_EMAIL, admin: ADMIN_EMAIL };
 
 // dozvoljeneUloge: npr. ['kuhinja','admin'] za /kuhinja, ili ['admin'] za /admin
 // porukaZabranjenogPristupa: tekst koji se prikaže ako se uloguje nalog koji nema pristup ovoj strani
 export function useInternoOsoblje(dozvoljeneUloge, porukaZabranjenogPristupa) {
   const [uloga, setUloga] = useState(null);
   const [ucitavanjeUloge, setUcitavanjeUloge] = useState(true);
+  const [email, setEmail] = useState("");
   const [pin, setPin] = useState("");
   const [prijavaUToku, setPrijavaUToku] = useState(false);
   const [greskaPristupa, setGreskaPristupa] = useState("");
@@ -90,27 +89,18 @@ export function useInternoOsoblje(dozvoljeneUloge, porukaZabranjenogPristupa) {
   }, []);
 
   // ---- Prijava - pravi Firebase Auth, PIN = lozinka (min 6 cifara) ----
-  // Probavamo SAMO emailove uloga dozvoljenih na OVOJ stranici, tim redom
-  // (npr. na /admin se nikad ne pokušava kuhinja nalog, bez obzira na PIN).
+  // Korisnik sad unosi i email i PIN direktno - nema više nagađanja koji je
+  // nalog u pitanju (jednostavnije i bez ikakve dvosmislenosti).
   const hendlajLogin = async (e) => {
     e.preventDefault();
     setGreskaPristupa("");
-    if (pin.length < 6 || prijavaUToku) return;
+    if (!email || pin.length < 6 || prijavaUToku) return;
     setPrijavaUToku(true);
-    const emailoviZaPokusaj = dozvoljeneUloge
-      .map((u) => EMAIL_PO_ULOZI[u])
-      .filter(Boolean);
-    let uspesnaPrijava = false;
-    for (const email of emailoviZaPokusaj) {
-      try {
-        await signInWithEmailAndPassword(auth, email, pin);
-        uspesnaPrijava = true;
-        break;
-      } catch (greska) {
-        // probaj sledeći dozvoljeni email
-      }
+    try {
+      await signInWithEmailAndPassword(auth, email.trim(), pin);
+    } catch (greska) {
+      setGreskaPristupa("Netačan email ili PIN kod!");
     }
-    if (!uspesnaPrijava) setGreskaPristupa("Netačan PIN kod!");
     setPin("");
     setPrijavaUToku(false);
   };
@@ -213,6 +203,8 @@ export function useInternoOsoblje(dozvoljeneUloge, porukaZabranjenogPristupa) {
     uloga,
     ucitavanjeUloge,
     imaPristup,
+    email,
+    setEmail,
     pin,
     setPin,
     prijavaUToku,

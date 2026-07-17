@@ -820,48 +820,49 @@ export default function Home() {
               {JELOVNIK.filter(
                 (j) => j.kategorija === selektovanaKategorija,
               ).map((jelo) => (
-                <div
-                  key={jelo.id}
-                  onClick={() => otvoriDodatke(jelo)}
-                  className="relative bg-white p-3 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3 cursor-pointer hover:border-slate-200 transition-all"
-                >
+                <div key={jelo.id} className="flex flex-col">
                   {jelo.tagovi && jelo.tagovi.length > 0 && (
                     <span
-                      className={`absolute top-2 right-2 text-[9px] font-bold uppercase px-2 py-0.5 rounded-full ${TAGOVI_INFO[jelo.tagovi[0]].boja}`}
+                      className={`self-start mb-1.5 ml-1 text-[9px] font-bold uppercase px-2 py-0.5 rounded-full ${TAGOVI_INFO[jelo.tagovi[0]].boja}`}
                     >
                       {TAGOVI_INFO[jelo.tagovi[0]][jezik]}
                     </span>
                   )}
-                  <div className="relative w-20 h-20 flex-shrink-0 rounded-xl overflow-hidden bg-slate-100">
-                    <Image
-                      src={jelo.slika_url}
-                      alt={jelo.naziv[jezik]}
-                      fill
-                      sizes="80px"
-                      className="object-cover"
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-slate-900 text-base truncate">
-                      {jelo.naziv[jezik]}
-                    </h3>
-                    <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">
-                      {jelo.opis[jezik]}
-                    </p>
-                    <p className="font-extrabold text-slate-900 mt-2">
-                      {jelo.cena} RSD
-                    </p>
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      otvoriDodatke(jelo);
-                    }}
-                    aria-label={`${t.addToCart} ${jelo.naziv[jezik]}`}
-                    className="bg-slate-900 text-white w-9 h-9 rounded-xl flex items-center justify-center font-bold shadow-md flex-shrink-0"
+                  <div
+                    onClick={() => otvoriDodatke(jelo)}
+                    className="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3 cursor-pointer hover:border-slate-200 transition-all"
                   >
-                    +
-                  </button>
+                    <div className="relative w-20 h-20 flex-shrink-0 rounded-xl overflow-hidden bg-slate-100">
+                      <Image
+                        src={jelo.slika_url}
+                        alt={jelo.naziv[jezik]}
+                        fill
+                        sizes="80px"
+                        className="object-cover"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-slate-900 text-base truncate">
+                        {jelo.naziv[jezik]}
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">
+                        {jelo.opis[jezik]}
+                      </p>
+                      <p className="font-extrabold text-slate-900 mt-2">
+                        {jelo.cena} RSD
+                      </p>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        otvoriDodatke(jelo);
+                      }}
+                      aria-label={`${t.addToCart} ${jelo.naziv[jezik]}`}
+                      className="bg-slate-900 text-white w-9 h-9 rounded-xl flex items-center justify-center font-bold shadow-md flex-shrink-0"
+                    >
+                      +
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1207,8 +1208,9 @@ export default function Home() {
         </button>
       </nav>
 
-      {/* Footer - vidljiv na desktopu (scroll), na mobilnom je iznad fiksnog nav-a */}
-      <footer className="hidden md:block bg-white border-t border-slate-100 mt-8">
+      {/* Footer - vidljiv na svim ekranima; na mobilnom ima extra padding
+          na dnu da ne bude prekriven fiksnim nav-om */}
+      <footer className="bg-white border-t border-slate-100 mt-8 pb-24 md:pb-0">
         <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 text-sm text-slate-500">
           <div>
             <div className="flex items-center gap-3 mb-2">

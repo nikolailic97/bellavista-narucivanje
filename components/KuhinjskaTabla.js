@@ -31,60 +31,59 @@ export default function KuhinjskaTabla({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {porudzbine.map((p) => {
             const kasni = jeliKasni(p, sadaTick);
+            const bojaTema = kasni
+              ? { okvir: "border-red-500 border-dashed", banner: "bg-red-500" }
+              : p.status === "novo"
+                ? { okvir: "border-orange-400", banner: "bg-orange-400" }
+                : p.status === "u_pripremi"
+                  ? { okvir: "border-blue-400", banner: "bg-blue-400" }
+                  : { okvir: "border-emerald-400", banner: "bg-emerald-400" };
             return (
               <div
                 key={p.id}
-                className={`bg-white p-4 rounded-xl border shadow-sm ${kasni ? "border-red-500 border-dashed border-2" : "border-slate-100"}`}
+                className={`rounded-xl overflow-hidden shadow-sm border-2 ${bojaTema.okvir}`}
               >
-                <div className="flex justify-between items-center mb-2">
-                  <span className="font-black text-lg text-slate-900">
+                <div
+                  className={`${bojaTema.banner} text-white text-center text-[10px] uppercase font-bold py-1.5 tracking-wide`}
+                >
+                  {kasni ? "Kasni" : NAZIV_STATUSA[p.status]}
+                </div>
+                <div className="bg-white p-4">
+                  <span className="font-black text-lg text-slate-900 block mb-2">
                     #{p.broj}
                   </span>
-                  <span
-                    className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full ${
-                      kasni
-                        ? "bg-red-100 text-red-600"
-                        : p.status === "novo"
-                          ? "bg-orange-100 text-orange-600"
-                          : p.status === "u_pripremi"
-                            ? "bg-blue-100 text-blue-600"
-                            : "bg-emerald-100 text-emerald-600"
-                    }`}
-                  >
-                    {kasni ? "KASNI" : NAZIV_STATUSA[p.status]}
-                  </span>
+                  <ul className="text-sm text-slate-700 space-y-1 mb-3">
+                    {(p.stavke || []).map((stavka, i) => (
+                      <li key={i}>
+                        {stavka.kolicina}x {stavka.naziv}
+                        {stavka.dodaci && stavka.dodaci.length > 0 && (
+                          <span className="text-slate-500">
+                            {" "}
+                            (+{stavka.dodaci.map((d) => d.naziv).join(", ")})
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="text-xs text-slate-600 bg-slate-50 rounded-lg p-2.5 mb-3 space-y-0.5">
+                    <p className="font-bold text-slate-800">{p.ime}</p>
+                    <p>{p.telefon}</p>
+                    <p>{p.adresa}</p>
+                  </div>
+                  {NAZIV_SLEDECE_AKCIJE[p.status] && (
+                    <button
+                      onClick={() => naNapredujStatus(p)}
+                      className={`w-full text-white font-bold text-xs py-2.5 rounded-lg transition-all ${
+                        kasni
+                          ? "bg-red-600 hover:bg-red-700"
+                          : "bg-slate-900 hover:bg-slate-800"
+                      }`}
+                      aria-label={`Promeni status porudžbine ${p.broj}`}
+                    >
+                      {NAZIV_SLEDECE_AKCIJE[p.status]}
+                    </button>
+                  )}
                 </div>
-                <ul className="text-sm text-slate-700 space-y-1 mb-3">
-                  {(p.stavke || []).map((stavka, i) => (
-                    <li key={i}>
-                      {stavka.kolicina}x {stavka.naziv}
-                      {stavka.dodaci && stavka.dodaci.length > 0 && (
-                        <span className="text-slate-500">
-                          {" "}
-                          (+{stavka.dodaci.map((d) => d.naziv).join(", ")})
-                        </span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-                <div className="text-xs text-slate-600 bg-slate-50 rounded-lg p-2.5 mb-3 space-y-0.5">
-                  <p className="font-bold text-slate-800">{p.ime}</p>
-                  <p>{p.telefon}</p>
-                  <p>{p.adresa}</p>
-                </div>
-                {NAZIV_SLEDECE_AKCIJE[p.status] && (
-                  <button
-                    onClick={() => naNapredujStatus(p)}
-                    className={`w-full text-white font-bold text-xs py-2.5 rounded-lg transition-all ${
-                      kasni
-                        ? "bg-red-600 hover:bg-red-700"
-                        : "bg-slate-900 hover:bg-slate-800"
-                    }`}
-                    aria-label={`Promeni status porudžbine ${p.broj}`}
-                  >
-                    {NAZIV_SLEDECE_AKCIJE[p.status]}
-                  </button>
-                )}
               </div>
             );
           })}

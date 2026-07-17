@@ -7,6 +7,8 @@ export default function KuhinjaStranica() {
   const {
     ucitavanjeUloge,
     imaPristup,
+    email,
+    setEmail,
     pin,
     setPin,
     prijavaUToku,
@@ -36,6 +38,8 @@ export default function KuhinjaStranica() {
         ) : !imaPristup ? (
           <PinPrijava
             naslov="Kuhinjska tabla"
+            email={email}
+            setEmail={setEmail}
             pin={pin}
             setPin={setPin}
             prijavaUToku={prijavaUToku}

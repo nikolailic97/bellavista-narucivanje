@@ -24,6 +24,8 @@ export default function AdminStranica() {
     imaPristup,
     pin,
     setPin,
+    email,
+    setEmail,
     prijavaUToku,
     greskaPristupa,
     hendlajLogin,
@@ -155,6 +157,8 @@ export default function AdminStranica() {
         ) : !imaPristup ? (
           <PinPrijava
             naslov="Admin kontrolna tabla"
+            email={email}
+            setEmail={setEmail}
             pin={pin}
             setPin={setPin}
             prijavaUToku={prijavaUToku}
