@@ -9,15 +9,16 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "firebase": "12.16.0",
-    "firebase-admin": "^14.1.0",
     "next": "16.2.10",
     "react": "19.2.7",
-    "react-dom": "19.2.7"
+    "react-dom": "19.2.7",
+    "firebase": "12.16.0",
+    "firebase-admin": "^14.1.0",
+    "recharts": "^3.9.2"
   },
   "devDependencies": {
+    "tailwindcss": "4.3.2",
     "@tailwindcss/postcss": "4.3.2",
-    "postcss": "8.5.19",
-    "tailwindcss": "4.3.2"
+    "postcss": "8.5.19"
   }
 }

@@ -50,7 +50,7 @@ export default function KuhinjaStranica() {
         ) : (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <h1 className="text-xl font-black text-slate-900">
+              <h1 className="text-xl font-black text-brand-dark">
                 Kuhinjska tabla
               </h1>
               <button

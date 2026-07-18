@@ -1,1 +1,10 @@
 @import "tailwindcss";
+
+/* Bellavista brend boje - ista tamna baza (#1A2328) kao na
+   restoran-bellavista sajtu, + zlatni akcent za "premium" ton. */
+@theme {
+  --color-brand-dark: #1a2328;
+  --color-brand-dark-hover: #263239;
+  --color-brand-gold: #c9a227;
+  --color-brand-gold-hover: #b3901f;
+}

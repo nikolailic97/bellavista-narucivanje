@@ -14,7 +14,7 @@ export default function PinPrijava({
         onSubmit={onSubmit}
         className="bg-white p-8 rounded-3xl border border-slate-100 shadow-lg text-center space-y-5"
       >
-        <div className="w-14 h-14 rounded-2xl bg-slate-900 text-white flex items-center justify-center mx-auto">
+        <div className="w-14 h-14 rounded-2xl bg-brand-dark text-white flex items-center justify-center mx-auto">
           <svg
             width="26"
             height="26"
@@ -31,7 +31,7 @@ export default function PinPrijava({
         </div>
 
         <div>
-          <h2 className="text-lg font-black text-slate-900">{naslov}</h2>
+          <h2 className="text-lg font-black text-brand-dark">{naslov}</h2>
           <p className="text-xs text-slate-500 mt-1">
             Unesi email i PIN kod za pristup
           </p>
@@ -67,7 +67,7 @@ export default function PinPrijava({
         <button
           type="submit"
           disabled={prijavaUToku}
-          className="w-full bg-slate-900 disabled:bg-slate-300 text-white font-bold p-3.5 rounded-xl text-sm hover:bg-slate-800 transition-all shadow-md"
+          className="w-full bg-brand-dark disabled:bg-slate-300 text-white font-bold p-3.5 rounded-xl text-sm hover:bg-brand-dark-hover transition-all shadow-md"
         >
           {prijavaUToku ? "Prijava u toku..." : "Prijavi se"}
         </button>

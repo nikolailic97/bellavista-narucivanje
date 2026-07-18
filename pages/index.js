@@ -476,19 +476,19 @@ export default function Home() {
           <nav className="hidden md:flex items-center gap-6">
             <button
               onClick={() => setAktivniTab("meni")}
-              className={`text-sm font-bold transition-all ${aktivniTab === "meni" ? "text-slate-900" : "text-slate-500 hover:text-slate-700"}`}
+              className={`text-sm font-bold transition-all ${aktivniTab === "meni" ? "text-brand-dark" : "text-slate-500 hover:text-slate-700"}`}
             >
               {t.menuTab}
             </button>
             <button
               onClick={() => setAktivniTab("korpa")}
-              className={`text-sm font-bold transition-all ${aktivniTab === "korpa" ? "text-slate-900" : "text-slate-500 hover:text-slate-700"}`}
+              className={`text-sm font-bold transition-all ${aktivniTab === "korpa" ? "text-brand-dark" : "text-slate-500 hover:text-slate-700"}`}
             >
               {t.cartTab} {brojStavkiKorpe > 0 && `(${brojStavkiKorpe})`}
             </button>
             <button
               onClick={() => setAktivniTab("prati")}
-              className={`text-sm font-bold transition-all ${aktivniTab === "prati" ? "text-slate-900" : "text-slate-500 hover:text-slate-700"}`}
+              className={`text-sm font-bold transition-all ${aktivniTab === "prati" ? "text-brand-dark" : "text-slate-500 hover:text-slate-700"}`}
             >
               {t.trackTab}
             </button>
@@ -514,7 +514,7 @@ export default function Home() {
                   onClick={() => setSelektovanaKategorija(kat.id)}
                   className={`px-4 py-2 rounded-full font-bold text-sm transition-all ${
                     selektovanaKategorija === kat.id
-                      ? "bg-slate-900 text-white shadow-md"
+                      ? "bg-brand-dark text-white shadow-md"
                       : "bg-white text-slate-600 border border-slate-100"
                   }`}
                 >
@@ -558,13 +558,13 @@ export default function Home() {
                     />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-slate-900 text-base truncate">
+                    <h3 className="font-bold text-brand-dark text-base truncate">
                       {jelo.naziv[jezik]}
                     </h3>
                     <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">
                       {jelo.opis[jezik]}
                     </p>
-                    <p className="font-extrabold text-slate-900 mt-2">
+                    <p className="font-extrabold text-brand-gold mt-2">
                       {jelo.cena} RSD
                     </p>
                   </div>
@@ -574,7 +574,7 @@ export default function Home() {
                       otvoriDodatke(jelo);
                     }}
                     aria-label={`${t.addToCart} ${jelo.naziv[jezik]}`}
-                    className="bg-slate-900 text-white w-9 h-9 rounded-xl flex items-center justify-center font-bold shadow-md flex-shrink-0"
+                    className="bg-brand-dark text-white w-9 h-9 rounded-xl flex items-center justify-center font-bold shadow-md flex-shrink-0"
                   >
                     +
                   </button>
@@ -586,7 +586,7 @@ export default function Home() {
 
         {aktivniTab === "korpa" && (
           <main className="p-4 max-w-xl mx-auto">
-            <h2 className="text-lg font-bold text-slate-900 mb-4">{t.cart}</h2>
+            <h2 className="text-lg font-bold text-brand-dark mb-4">{t.cart}</h2>
             {korpa.length === 0 ? (
               <p className="text-slate-500 text-sm text-center py-8">
                 {t.cartEmpty}
@@ -599,7 +599,7 @@ export default function Home() {
                     className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex justify-between items-center"
                   >
                     <div>
-                      <h4 className="font-bold text-slate-900 text-sm">
+                      <h4 className="font-bold text-brand-dark text-sm">
                         {item.naziv}
                       </h4>
                       {item.dodaci.length > 0 && (
@@ -607,7 +607,7 @@ export default function Home() {
                           + {item.dodaci.map((d) => d.naziv).join(", ")}
                         </p>
                       )}
-                      <p className="font-bold text-slate-900 text-xs mt-1">
+                      <p className="font-bold text-brand-dark text-xs mt-1">
                         {item.cena_po_komadu * item.kolicina} RSD
                       </p>
                     </div>
@@ -620,7 +620,7 @@ export default function Home() {
                         >
                           -
                         </button>
-                        <span className="text-xs font-bold text-slate-900">
+                        <span className="text-xs font-bold text-brand-dark">
                           {item.kolicina}
                         </span>
                         <button
@@ -663,7 +663,7 @@ export default function Home() {
                   <hr className="border-slate-100 my-1" />
                   <div className="flex justify-between text-slate-950 font-black text-sm">
                     <span>{t.total}:</span>
-                    <span>{ukupnaCena} RSD</span>
+                    <span className="text-brand-gold">{ukupnaCena} RSD</span>
                   </div>
                 </div>
 
@@ -710,7 +710,7 @@ export default function Home() {
                   <button
                     type="submit"
                     disabled={slanjeUToku}
-                    className="w-full bg-slate-900 disabled:bg-slate-300 text-white font-bold p-3.5 rounded-xl shadow-md text-sm transition-all hover:bg-slate-800"
+                    className="w-full bg-brand-dark disabled:bg-slate-300 text-white font-bold p-3.5 rounded-xl shadow-md text-sm transition-all hover:bg-brand-dark-hover"
                   >
                     {slanjeUToku ? "..." : t.placeOrder}
                   </button>
@@ -722,7 +722,7 @@ export default function Home() {
 
         {aktivniTab === "prati" && (
           <main className="p-4 text-center max-w-md mx-auto">
-            <h2 className="text-lg font-bold text-slate-900 mb-6">
+            <h2 className="text-lg font-bold text-brand-dark mb-6">
               {t.trackOrder}
             </h2>
 
@@ -738,7 +738,7 @@ export default function Home() {
               />
               <button
                 type="submit"
-                className="bg-slate-900 text-white font-bold text-sm px-5 rounded-lg"
+                className="bg-brand-dark text-white font-bold text-sm px-5 rounded-lg"
               >
                 {t.trackCodeBtn}
               </button>
@@ -750,7 +750,7 @@ export default function Home() {
               <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                 <p className="text-sm text-slate-500">
                   {t.orderNotFound}{" "}
-                  <span className="font-bold text-slate-900">
+                  <span className="font-bold text-brand-dark">
                     #{aktivniIdPorudzbine}
                   </span>
                 </p>
@@ -760,7 +760,7 @@ export default function Home() {
                 <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">
                   {t.orderId}
                 </span>
-                <p className="text-2xl font-black text-slate-900 mt-0">
+                <p className="text-2xl font-black text-brand-dark mt-0">
                   #{aktivniIdPorudzbine}
                 </p>
 
@@ -780,7 +780,7 @@ export default function Home() {
                     <span className="text-xs text-slate-500 block mb-0.5">
                       {t.estimatedWait}:
                     </span>
-                    <span className="font-extrabold text-slate-900">
+                    <span className="font-extrabold text-brand-dark">
                       {preostaloCekanjeSek === null
                         ? "—"
                         : preostaloCekanjeSek <= 0
@@ -806,7 +806,7 @@ export default function Home() {
           >
             <div className="flex justify-between items-start">
               <div>
-                <h3 className="text-lg font-black text-slate-900">
+                <h3 className="text-lg font-black text-brand-dark">
                   {otvorenPanelJelo.naziv[jezik]}
                 </h3>
                 {otvorenPanelJelo.tagovi &&
@@ -856,7 +856,7 @@ export default function Home() {
                           onClick={() => hendlajDodatak(dodatak)}
                           className={`w-full flex justify-between items-center p-3 rounded-xl border text-sm font-bold transition-all ${
                             jeIzabran
-                              ? "bg-slate-900 border-slate-900 text-white"
+                              ? "bg-brand-dark border-brand-dark text-white"
                               : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
                           }`}
                         >
@@ -872,7 +872,7 @@ export default function Home() {
 
             <button
               onClick={dodajUKorpu}
-              className="w-full bg-slate-900 text-white font-bold p-4 rounded-xl text-sm transition-all hover:bg-slate-800 shadow-md"
+              className="w-full bg-brand-dark text-white font-bold p-4 rounded-xl text-sm transition-all hover:bg-brand-dark-hover shadow-md"
             >
               {t.addToCart}
             </button>
@@ -897,14 +897,14 @@ export default function Home() {
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 py-2 px-4 flex justify-around items-center shadow-lg z-40">
         <button
           onClick={() => setAktivniTab("meni")}
-          className={`flex flex-col items-center gap-0.5 ${aktivniTab === "meni" ? "text-slate-900" : "text-slate-500"}`}
+          className={`flex flex-col items-center gap-0.5 ${aktivniTab === "meni" ? "text-brand-dark" : "text-slate-500"}`}
         >
           <IkonicaMeni aktivna={aktivniTab === "meni"} />
           <span className="text-[10px] font-bold">{t.menuTab}</span>
         </button>
         <button
           onClick={() => setAktivniTab("korpa")}
-          className={`flex flex-col items-center gap-0.5 relative ${aktivniTab === "korpa" ? "text-slate-900" : "text-slate-500"}`}
+          className={`flex flex-col items-center gap-0.5 relative ${aktivniTab === "korpa" ? "text-brand-dark" : "text-slate-500"}`}
         >
           <IkonicaKorpa aktivna={aktivniTab === "korpa"} />
           {brojStavkiKorpe > 0 && (
@@ -916,7 +916,7 @@ export default function Home() {
         </button>
         <button
           onClick={() => setAktivniTab("prati")}
-          className={`flex flex-col items-center gap-0.5 ${aktivniTab === "prati" ? "text-slate-900" : "text-slate-500"}`}
+          className={`flex flex-col items-center gap-0.5 ${aktivniTab === "prati" ? "text-brand-dark" : "text-slate-500"}`}
         >
           <IkonicaPrati aktivna={aktivniTab === "prati"} />
           <span className="text-[10px] font-bold">{t.trackTab}</span>
