@@ -27,10 +27,10 @@ import {
 
 // ============ TODO: ZAMENI KAD DOBIJEMO FINALNI NAZIV/LOGO ============
 const NAZIV_RESTORANA = "Restoran"; // koristi se u title/meta/JSON-LD, logo slika ide preko /images/logo.png
-const INSTAGRAM_URL = "https://instagram.com/"; // TODO: zameni pravim profilom
-const KONTAKT_TELEFON = "+381 60 000 0000"; // TODO: zameni pravim brojem
+const INSTAGRAM_URL = "https://www.instagram.com/bellavista_restoran/"; // TODO: zameni pravim profilom
+const KONTAKT_TELEFON = "+381 63 1110009"; // TODO: zameni pravim brojem
 const GOOGLE_RECENZIJA_URL = "https://g.page/r/PLACEHOLDER/review"; // TODO: zameni pravim Google recenzija linkom
-const SAJT_ILICODE = "https://ilicodes.com";
+const SAJT_ILICODE = "https://nikolailic97.github.io/ilicode-studio/";
 const PRAG_BESPLATNE_DOSTAVE = 1600;
 const CENA_DOSTAVE = 200;
 
@@ -650,9 +650,7 @@ export default function Home() {
                   <div className="flex justify-between text-slate-500">
                     <span>{t.delivery}:</span>
                     <span className="font-bold">
-                      {trosakDostave === 0
-                        ? "0 RSD 🎉"
-                        : `${trosakDostave} RSD`}
+                      {trosakDostave === 0 ? "0 RSD" : `${trosakDostave} RSD`}
                     </span>
                   </div>
                   {trosakDostave > 0 && (
