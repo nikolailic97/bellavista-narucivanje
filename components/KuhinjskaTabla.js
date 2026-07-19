@@ -73,6 +73,12 @@ function PorudzbinaKartica({
             <span className="text-slate-500">Adresa: </span>
             <span className="font-bold text-slate-900">{p.adresa}</span>
           </p>
+          {p.napomena && (
+            <p>
+              <span className="text-slate-500">Napomena: </span>
+              <span className="font-bold text-amber-700">{p.napomena}</span>
+            </p>
+          )}
         </div>
 
         {/* Procenjeno vreme - kuhinja/admin mogu da ga menjaju (npr. gužva u

@@ -32,6 +32,7 @@ const INSTAGRAM_URL = "https://www.instagram.com/bellavista_restoran/"; // TODO:
 const KONTAKT_TELEFON = "+381 63 1110009"; // TODO: zameni pravim brojem
 const SAJT_ILICODE = "https://nikolailic97.github.io/ilicode-studio/";
 const PRAG_BESPLATNE_DOSTAVE = 1600;
+const MIN_VIDLJIVOSTI_POSLE_ZAVRSETKA = 10; // minuti - koliko dugo kupac vidi/pretražuje gotovu porudžbinu
 const CENA_DOSTAVE = 200;
 
 // Konstante za procenu vremena pripreme - lako se štimuju kasnije
@@ -73,6 +74,7 @@ const PREVODI = {
     name: "Tvoje ime",
     phone: "Broj telefona",
     address: "Adresa i stan",
+    orderNotePlaceholder: "Napomena (opciono) - npr. bez pečurki",
     subtotal: "Cena hrane",
     delivery: "Dostava",
     total: "Ukupno za plaćanje",
@@ -110,6 +112,7 @@ const PREVODI = {
     name: "Your Name",
     phone: "Phone Number",
     address: "Delivery Address",
+    orderNotePlaceholder: "Note (optional) - e.g. no mushrooms",
     subtotal: "Subtotal",
     delivery: "Delivery",
     total: "Total Payment",
@@ -201,7 +204,12 @@ export default function Home() {
   const [otvorenPanelJelo, setOtvorenPanelJelo] = useState(null);
   const [korpa, setKorpa] = useState([]);
   const [izabraniDodaci, setIzabraniDodaci] = useState([]);
-  const [forma, setForma] = useState({ ime: "", telefon: "", adresa: "" });
+  const [forma, setForma] = useState({
+    ime: "",
+    telefon: "",
+    adresa: "",
+    napomena: "",
+  });
   const [aktivniIdPorudzbine, setAktivniIdPorudzbine] = useState("");
   const [unetiKod, setUnetiKod] = useState("");
   const [statusPorudzbine, setStatusPorudzbine] = useState(null);
@@ -369,6 +377,7 @@ export default function Home() {
           ime: forma.ime,
           telefon: forma.telefon,
           adresa: forma.adresa,
+          napomena: forma.napomena || "",
           stavke: korpa,
           cena_ukupno: ukupnaCena,
           nacin_placanja: "gotovina",
@@ -389,7 +398,7 @@ export default function Home() {
       setAktivniIdPorudzbine(finalniBroj);
       setStatusPorudzbine(null);
       setKorpa([]);
-      setForma({ ime: "", telefon: "", adresa: "" });
+      setForma({ ime: "", telefon: "", adresa: "", napomena: "" });
       setAktivniTab("prati");
     } catch (greska) {
       console.error("Greška prilikom slanja porudžbine:", greska);
@@ -409,8 +418,25 @@ export default function Home() {
     try {
       const snap = await getDoc(doc(db, "status_porudzbine", ciljniKod));
       if (snap.exists()) {
-        setStatusPorudzbine(snap.data());
-        setPorudzbinaNijeNadjena(false);
+        const podaci = snap.data();
+        // Kad je porudžbina gotova (status "zavrseno"), kupac je i dalje vidi
+        // ~10 minuta, pa onda "nestaje" (ne postoji za njega) - staff je i
+        // dalje vidi/pretražuje normalno do "Zatvori poslovni dan".
+        const zavrsenoMs = vremeUMilisekundama(podaci.vreme_zavrseno);
+        const jeIstekla =
+          podaci.status === "zavrseno" &&
+          zavrsenoMs &&
+          Date.now() - zavrsenoMs > MIN_VIDLJIVOSTI_POSLE_ZAVRSETKA * 60000;
+        if (jeIstekla) {
+          setStatusPorudzbine(null);
+          setPorudzbinaNijeNadjena(true);
+          if (ciljniKod === aktivniIdPorudzbine) {
+            localStorage.removeItem("id_porudzbine");
+          }
+        } else {
+          setStatusPorudzbine(podaci);
+          setPorudzbinaNijeNadjena(false);
+        }
       } else {
         setStatusPorudzbine(null);
         setPorudzbinaNijeNadjena(true);
@@ -762,6 +788,16 @@ export default function Home() {
                     }
                     className="w-full border border-slate-200 rounded-lg p-2.5 text-base"
                     aria-label={t.address}
+                  />
+                  <textarea
+                    placeholder={t.orderNotePlaceholder}
+                    value={forma.napomena}
+                    onChange={(e) =>
+                      setForma({ ...forma, napomena: e.target.value })
+                    }
+                    rows={2}
+                    className="w-full border border-slate-200 rounded-lg p-2.5 text-base resize-none"
+                    aria-label={t.orderNotePlaceholder}
                   />
                   <button
                     type="submit"

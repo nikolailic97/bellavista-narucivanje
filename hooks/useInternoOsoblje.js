@@ -118,10 +118,20 @@ export function useInternoOsoblje(dozvoljeneUloge, porukaZabranjenogPristupa) {
     if (!sledeci) return;
     try {
       const batch = writeBatch(db);
-      batch.update(doc(db, "porudzbine", porudzbina.id), { status: sledeci });
-      batch.update(doc(db, "status_porudzbine", porudzbina.broj), {
-        status: sledeci,
-      });
+      const azuriranjePorudzbine = { status: sledeci };
+      const azuriranjeStatusa = { status: sledeci };
+      // Kad porudžbina stigne do finalnog statusa ("zavrseno"), beležimo kad
+      // se to desilo - kupac prestaje da vidi/pretražuje tu porudžbinu ~10min
+      // posle ovog trenutka (vidi pages/index.js osveziStatusPorudzbine).
+      if (sledeci === "zavrseno") {
+        azuriranjePorudzbine.vreme_zavrseno = serverTimestamp();
+        azuriranjeStatusa.vreme_zavrseno = serverTimestamp();
+      }
+      batch.update(doc(db, "porudzbine", porudzbina.id), azuriranjePorudzbine);
+      batch.update(
+        doc(db, "status_porudzbine", porudzbina.broj),
+        azuriranjeStatusa,
+      );
       await batch.commit();
     } catch (greska) {
       console.error("Greška pri promeni statusa:", greska);
