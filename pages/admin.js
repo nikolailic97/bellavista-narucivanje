@@ -19,10 +19,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
 } from "recharts";
 import { db } from "../lib/firebase";
 import { danasnjiDatum } from "../lib/pomocne";
@@ -65,6 +61,11 @@ export default function AdminStranica() {
   const [pretragaRezultat, setPretragaRezultat] = useState(null);
   const [pretragaNijeNadjena, setPretragaNijeNadjena] = useState(false);
   const [pretragaUToku, setPretragaUToku] = useState(false);
+
+  const [recenzije, setRecenzije] = useState([]);
+  const [recenzijeUcitavanje, setRecenzijeUcitavanje] = useState(false);
+  const [filterZvezdice, setFilterZvezdice] = useState(0); // 0 = sve
+  const [otvorenaRecenzija, setOtvorenaRecenzija] = useState(null);
 
   // ---- Admin analitika: čita samo izveštaje, ručno + na promenu perioda ----
   const ucitajAnalitiku = async (period) => {
@@ -146,6 +147,33 @@ export default function AdminStranica() {
     }
   };
 
+  // ---- Recenzije - sve učitane odjednom (mala/srednja količina za lokalni
+  // restoran), sortirane najnovije prvo, filter po zvezdicama je client-side ----
+  const ucitajRecenzije = async () => {
+    setRecenzijeUcitavanje(true);
+    try {
+      const q = query(
+        collection(db, "recenzije"),
+        orderBy("vreme_kreiranja", "desc"),
+        limit(500),
+      );
+      const snap = await getDocs(q);
+      setRecenzije(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    } catch (greska) {
+      console.error("Greška pri učitavanju recenzija:", greska);
+      setRecenzije([]);
+    } finally {
+      setRecenzijeUcitavanje(false);
+    }
+  };
+
+  useEffect(() => {
+    if (imaPristup && recenzije.length === 0) {
+      ucitajRecenzije();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imaPristup]);
+
   const zbirAnalitike = analitikaPodaci.reduce(
     (zbir, izvestaj) => {
       zbir.ukupnoPorudzbina += izvestaj.total_orders || 0;
@@ -162,15 +190,28 @@ export default function AdminStranica() {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5);
 
+  const sveStavkePoProdaji = Object.entries(zbirAnalitike.topStavke)
+    .sort((a, b) => b[1] - a[1])
+    .map(([naziv, kolicina]) => ({ naziv, kolicina }));
+
   const podaciZaGrafikPrihoda = analitikaPodaci.map((izvestaj) => ({
     datum: izvestaj.datum.slice(5), // MM-DD, kraće za osu
     prihod: izvestaj.total_revenue || 0,
   }));
 
-  const podaciZaPitu = topPetStavki.map(([naziv, kolicina]) => ({
-    naziv,
-    kolicina,
+  const brojRecenzija = recenzije.length;
+  const prosecnaOcena =
+    brojRecenzija > 0
+      ? recenzije.reduce((zbir, r) => zbir + r.zvezdice, 0) / brojRecenzija
+      : 0;
+  const histogramOcena = [5, 4, 3, 2, 1].map((zvezde) => ({
+    zvezde,
+    broj: recenzije.filter((r) => r.zvezdice === zvezde).length,
   }));
+  const prikazaneRecenzije =
+    filterZvezdice === 0
+      ? recenzije
+      : recenzije.filter((r) => r.zvezdice === filterZvezdice);
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans antialiased text-slate-800">
@@ -210,7 +251,7 @@ export default function AdminStranica() {
               </button>
             </div>
 
-            <div className="grid grid-cols-3 gap-1.5 bg-slate-100 p-1 rounded-xl max-w-md">
+            <div className="grid grid-cols-4 gap-1.5 bg-slate-100 p-1 rounded-xl max-w-lg">
               <button
                 onClick={() => setPregled("analitika")}
                 className={`text-xs uppercase tracking-wide font-bold p-2 rounded-lg transition-all ${pregled === "analitika" ? "bg-white text-brand-dark shadow-sm" : "text-slate-500"}`}
@@ -228,6 +269,12 @@ export default function AdminStranica() {
                 className={`text-xs uppercase tracking-wide font-bold p-2 rounded-lg transition-all ${pregled === "pretraga" ? "bg-white text-brand-dark shadow-sm" : "text-slate-500"}`}
               >
                 Pretraga
+              </button>
+              <button
+                onClick={() => setPregled("recenzije")}
+                className={`text-xs uppercase tracking-wide font-bold p-2 rounded-lg transition-all ${pregled === "recenzije" ? "bg-white text-brand-dark shadow-sm" : "text-slate-500"}`}
+              >
+                Recenzije
               </button>
             </div>
 
@@ -332,6 +379,142 @@ export default function AdminStranica() {
               </div>
             )}
 
+            {pregled === "recenzije" && (
+              <div className="max-w-2xl space-y-4">
+                {recenzijeUcitavanje ? (
+                  <p className="text-center text-slate-500 text-sm py-6">
+                    Učitavanje...
+                  </p>
+                ) : (
+                  <>
+                    <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex items-center gap-6">
+                      <div className="text-center">
+                        <span className="text-3xl font-black text-brand-gold block">
+                          {prosecnaOcena.toFixed(1)}
+                        </span>
+                        <span className="text-amber-400 text-sm">★★★★★</span>
+                        <span className="text-[10px] text-slate-500 block mt-0.5">
+                          {brojRecenzija}{" "}
+                          {brojRecenzija === 1 ? "ocena" : "ocena ukupno"}
+                        </span>
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        {histogramOcena.map(({ zvezde, broj }) => (
+                          <div
+                            key={zvezde}
+                            className="flex items-center gap-2 text-xs"
+                          >
+                            <span className="w-8 text-slate-500">
+                              {zvezde}★
+                            </span>
+                            <div className="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden">
+                              <div
+                                className="bg-brand-gold h-2 rounded-full"
+                                style={{
+                                  width:
+                                    brojRecenzija > 0
+                                      ? `${(broj / brojRecenzija) * 100}%`
+                                      : "0%",
+                                }}
+                              />
+                            </div>
+                            <span className="w-6 text-right font-bold text-slate-700">
+                              {broj}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex gap-1.5 flex-wrap">
+                      <button
+                        onClick={() => setFilterZvezdice(0)}
+                        className={`text-xs font-bold px-3 py-1.5 rounded-full transition-all ${filterZvezdice === 0 ? "bg-brand-dark text-white" : "bg-slate-100 text-slate-600"}`}
+                      >
+                        Sve
+                      </button>
+                      {[5, 4, 3, 2, 1].map((z) => (
+                        <button
+                          key={z}
+                          onClick={() => setFilterZvezdice(z)}
+                          className={`text-xs font-bold px-3 py-1.5 rounded-full transition-all ${filterZvezdice === z ? "bg-brand-dark text-white" : "bg-slate-100 text-slate-600"}`}
+                        >
+                          {z}★
+                        </button>
+                      ))}
+                    </div>
+
+                    {prikazaneRecenzije.length === 0 ? (
+                      <p className="text-center text-slate-500 text-sm py-8">
+                        Nema recenzija za prikaz.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {prikazaneRecenzije.map((r) => (
+                          <button
+                            key={r.id}
+                            onClick={() => setOtvorenaRecenzija(r)}
+                            className="w-full text-left bg-white p-3.5 rounded-xl border border-slate-100 shadow-sm hover:border-slate-200 transition-all"
+                          >
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="text-amber-400 text-sm">
+                                {"★".repeat(r.zvezdice)}
+                                <span className="text-slate-200">
+                                  {"★".repeat(5 - r.zvezdice)}
+                                </span>
+                              </span>
+                              <span className="text-[10px] text-slate-400">
+                                {r.datum}
+                              </span>
+                            </div>
+                            {r.tekst && (
+                              <p className="text-sm text-slate-600 truncate">
+                                {r.tekst}
+                              </p>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {otvorenaRecenzija && (
+              <div
+                className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
+                onClick={() => setOtvorenaRecenzija(null)}
+              >
+                <div
+                  className="bg-white w-full max-w-md rounded-2xl p-6 space-y-3 shadow-2xl"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex justify-between items-start">
+                    <span className="text-amber-400 text-lg">
+                      {"★".repeat(otvorenaRecenzija.zvezdice)}
+                      <span className="text-slate-200">
+                        {"★".repeat(5 - otvorenaRecenzija.zvezdice)}
+                      </span>
+                    </span>
+                    <button
+                      onClick={() => setOtvorenaRecenzija(null)}
+                      className="text-slate-500 hover:text-slate-600 font-bold text-xl p-1"
+                      aria-label="Zatvori"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    {otvorenaRecenzija.datum}
+                  </p>
+                  <p className="text-sm text-slate-700 leading-relaxed">
+                    {otvorenaRecenzija.tekst || "(bez teksta)"}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {pregled === "analitika" && (
               <div className="space-y-4">
                 <div className="grid grid-cols-4 gap-1.5 bg-slate-100 p-1 rounded-xl max-w-sm">
@@ -370,6 +553,18 @@ export default function AdminStranica() {
                           RSD
                         </span>
                       </div>
+                      <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                        <span className="text-[10px] text-slate-500 font-bold uppercase block">
+                          Prosečna ocena
+                        </span>
+                        <span className="text-2xl font-black text-brand-dark">
+                          {brojRecenzija > 0 ? prosecnaOcena.toFixed(1) : "—"}
+                        </span>
+                        <span className="text-[10px] text-slate-400 block">
+                          {brojRecenzija}{" "}
+                          {brojRecenzija === 1 ? "ocena" : "ocena ukupno"}
+                        </span>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-5xl">
@@ -403,38 +598,84 @@ export default function AdminStranica() {
                         </div>
                       )}
 
-                      {podaciZaPitu.length > 0 && (
+                      {topPetStavki.length > 0 && (
                         <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
                           <span className="text-[10px] text-slate-500 font-bold uppercase block mb-3">
                             Top 5 najprodavanijih
                           </span>
-                          <ResponsiveContainer width="100%" height={220}>
-                            <PieChart>
-                              <Pie
-                                data={podaciZaPitu}
-                                dataKey="kolicina"
-                                nameKey="naziv"
-                                cx="50%"
-                                cy="50%"
-                                outerRadius={75}
-                                label={({ naziv }) => naziv}
-                                labelLine={false}
-                                style={{ fontSize: 11 }}
+                          <ul className="space-y-2">
+                            {topPetStavki.map(([naziv, kolicina], i) => (
+                              <li
+                                key={naziv}
+                                className="flex items-center gap-3"
                               >
-                                {podaciZaPitu.map((_, i) => (
-                                  <Cell
-                                    key={i}
-                                    fill={
-                                      BOJE_GRAFIKONA[i % BOJE_GRAFIKONA.length]
-                                    }
-                                  />
-                                ))}
-                              </Pie>
+                                <span
+                                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0 ${
+                                    i === 0
+                                      ? "bg-amber-400 text-white"
+                                      : i === 1
+                                        ? "bg-slate-300 text-white"
+                                        : i === 2
+                                          ? "bg-orange-300 text-white"
+                                          : "bg-slate-100 text-slate-500"
+                                  }`}
+                                >
+                                  {i + 1}
+                                </span>
+                                <span className="flex-1 text-sm font-medium text-slate-700 truncate">
+                                  {naziv}
+                                </span>
+                                <span className="text-sm font-black text-brand-dark">
+                                  {kolicina}x
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {sveStavkePoProdaji.length > 0 && (
+                        <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm lg:col-span-2">
+                          <span className="text-[10px] text-slate-500 font-bold uppercase block mb-3">
+                            Prodato po stavci
+                          </span>
+                          <ResponsiveContainer
+                            width="100%"
+                            height={Math.max(
+                              160,
+                              sveStavkePoProdaji.length * 32,
+                            )}
+                          >
+                            <BarChart
+                              data={sveStavkePoProdaji}
+                              layout="vertical"
+                              margin={{ left: 8 }}
+                            >
+                              <CartesianGrid
+                                strokeDasharray="3 3"
+                                stroke="#f1f5f9"
+                              />
+                              <XAxis
+                                type="number"
+                                tick={{ fontSize: 11 }}
+                                allowDecimals={false}
+                              />
+                              <YAxis
+                                type="category"
+                                dataKey="naziv"
+                                tick={{ fontSize: 11 }}
+                                width={140}
+                              />
                               <Tooltip
+                                formatter={(value) => [`${value}x`, "Prodato"]}
                                 contentStyle={{ fontSize: 12, borderRadius: 8 }}
                               />
-                              <Legend wrapperStyle={{ fontSize: 11 }} />
-                            </PieChart>
+                              <Bar
+                                dataKey="kolicina"
+                                fill="#1A2328"
+                                radius={[0, 4, 4, 0]}
+                              />
+                            </BarChart>
                           </ResponsiveContainer>
                         </div>
                       )}

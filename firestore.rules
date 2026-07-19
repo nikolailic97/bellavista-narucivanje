@@ -47,5 +47,21 @@ service cloud.firestore {
     match /izvestaji_status/{datum} {
       allow read, write: if jeOsoblje();
     }
+
+    // Recenzije kupaca - gost sme SAMO da kreira (1-5 zvezdica + opcioni
+    // tekst), čita/briše samo admin (interna reputacija/žalbe, ne javni podaci).
+    match /recenzije/{id} {
+      allow create: if request.resource.data.keys().hasAll(['zvezdice', 'datum', 'vreme_kreiranja'])
+                    && request.resource.data.zvezdice is int
+                    && request.resource.data.zvezdice >= 1
+                    && request.resource.data.zvezdice <= 5;
+      allow read, update, delete: if jeUloga('admin');
+    }
   }
 }
+
+// NAPOMENA: validacija cene pri kreiranju porudžbine nije moguća bez Cloud
+// Function-a (svesna odluka, u skladu sa zero-cost arhitekturom). Rules
+// proveravaju samo da status pri kreiranju bude "novo" i da obavezna polja
+// postoje — dovoljno da spreči slučajno/nepotpuno upisane dokumente, ne i
+// zlonamerno menjanje cena (isti nivo poverenja kao i ostatak MVP-a).

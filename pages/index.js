@@ -4,6 +4,7 @@ import Image from "next/image";
 import {
   collection,
   doc,
+  addDoc,
   getDoc,
   query,
   where,
@@ -29,7 +30,6 @@ import {
 const NAZIV_RESTORANA = "Restoran"; // koristi se u title/meta/JSON-LD, logo slika ide preko /images/logo.png
 const INSTAGRAM_URL = "https://www.instagram.com/bellavista_restoran/"; // TODO: zameni pravim profilom
 const KONTAKT_TELEFON = "+381 63 1110009"; // TODO: zameni pravim brojem
-const GOOGLE_RECENZIJA_URL = "https://g.page/r/PLACEHOLDER/review"; // TODO: zameni pravim Google recenzija linkom
 const SAJT_ILICODE = "https://nikolailic97.github.io/ilicode-studio/";
 const PRAG_BESPLATNE_DOSTAVE = 1600;
 const CENA_DOSTAVE = 200;
@@ -96,7 +96,12 @@ const PREVODI = {
     trackCodeBtn: "Prati",
     orLastOrder: "ili tvoja poslednja porudžbina:",
     orderNotFound: "Porudžbina sa ovim kodom ne postoji:",
-    reviewUs: "Oceni nas na Google-u",
+    reviewUs: "Oceni nas",
+    reviewModalTitle: "Kako ti se svidela porudžbina?",
+    reviewTextPlaceholder: "Reci nam više (opciono)",
+    reviewSubmit: "Pošalji ocenu",
+    reviewThanks: "Hvala na oceni!",
+    reviewAlreadyDone: "Već si nas nedavno ocenio. Hvala!",
   },
   en: {
     cart: "Your Cart",
@@ -128,7 +133,12 @@ const PREVODI = {
     trackCodeBtn: "Track",
     orLastOrder: "or your last order:",
     orderNotFound: "No order found with this code:",
-    reviewUs: "Rate us on Google",
+    reviewUs: "Rate us",
+    reviewModalTitle: "How was your order?",
+    reviewTextPlaceholder: "Tell us more (optional)",
+    reviewSubmit: "Submit rating",
+    reviewThanks: "Thanks for the feedback!",
+    reviewAlreadyDone: "You already rated us recently. Thanks!",
   },
 };
 
@@ -200,6 +210,11 @@ export default function Home() {
   const [preostaloCekanjeSek, setPreostaloCekanjeSek] = useState(null);
   const [slanjeUToku, setSlanjeUToku] = useState(false);
   const [osvezavanjeUToku, setOsvezavanjeUToku] = useState(false);
+  const [modalOcenaOtvoren, setModalOcenaOtvoren] = useState(false);
+  const [izabraneZvezdice, setIzabraneZvezdice] = useState(0);
+  const [tekstOcene, setTekstOcene] = useState("");
+  const [slanjeOceneUToku, setSlanjeOceneUToku] = useState(false);
+  const [ocenaPoslata, setOcenaPoslata] = useState(false);
 
   const t = PREVODI[jezik];
 
@@ -386,9 +401,10 @@ export default function Home() {
 
   // ---- Osvežavanje statusa - i dalje interno limitirano na 180s (štiti
   // Firestore troškove), ali se to nikad ne pokazuje korisniku ----
-  const osveziStatusPorudzbine = async (kod) => {
+  const osveziStatusPorudzbine = async (kod, prisilno = false) => {
     const ciljniKod = kod || aktivniIdPorudzbine;
-    if (!ciljniKod || preostaloVreme > 0 || osvezavanjeUToku) return;
+    if (!ciljniKod || osvezavanjeUToku) return;
+    if (!prisilno && preostaloVreme > 0) return;
     setOsvezavanjeUToku(true);
     try {
       const snap = await getDoc(doc(db, "status_porudzbine", ciljniKod));
@@ -417,23 +433,63 @@ export default function Home() {
     const noviKod = kod !== aktivniIdPorudzbine;
     setUnetiKod("");
     if (noviKod) {
-      // druga porudžbina - učitaj sve ispočetka, dozvoli odmah prvu proveru
-      setPreostaloVreme(0);
+      // druga porudžbina - učitaj sve ispočetka, uvek prikaži odmah (force)
       setStatusPorudzbine(null);
       setPorudzbinaNijeNadjena(false);
       localStorage.setItem("id_porudzbine", kod);
       setAktivniIdPorudzbine(kod);
-      osveziStatusPorudzbine(kod);
-    } else if (!statusPorudzbine && !porudzbinaNijeNadjena) {
-      // ista porudžbina, još nema podataka učitanih (npr. prvi put) - učitaj
-      osveziStatusPorudzbine(kod);
+      osveziStatusPorudzbine(kod, true);
+    } else if (preostaloVreme <= 0) {
+      // ista porudžbina, i interni 3-min keš je istekao - tiho osveži
+      // (korisnik ne vidi da postoji ikakav keš/limit, samo dobije nove podatke)
+      osveziStatusPorudzbine(kod, true);
     }
-    // ista porudžbina i već imamo podatke u memoriji - ništa ne diramo,
-    // ostaje prikazano ono što je već učitano (bez čekanja na cooldown)
+    // ista porudžbina i keš još važi (< 3 min od poslednje provere) - ništa ne
+    // diramo, ostaje prikazano ono što je već učitano
+  };
+
+  const otvoriModalOcene = () => {
+    setIzabraneZvezdice(0);
+    setTekstOcene("");
+    setOcenaPoslata(false);
+    setModalOcenaOtvoren(true);
+  };
+
+  // ---- Recenzija - gost sme samo da kreira, bez čitanja tuđih recenzija.
+  // Interno (lokalno, localStorage) zaključavamo na 24h da sprečimo spam -
+  // ovo NIJE prava bezbednosna brava (neko bi mogao da obriše localStorage),
+  // ali dovoljno je za normalne korisnike, i ne zahteva Cloud Function. ----
+  const POSLEDNJA_OCENA_KLJUC = "poslednja_ocena_vreme";
+  const OCENA_ZAKLJUCAVANJE_MS = 24 * 60 * 60 * 1000; // 24h
+
+  const jeOcenaZakljucana = () => {
+    const poslednja = localStorage.getItem(POSLEDNJA_OCENA_KLJUC);
+    if (!poslednja) return false;
+    return Date.now() - Number(poslednja) < OCENA_ZAKLJUCAVANJE_MS;
+  };
+
+  const posaljiOcenu = async () => {
+    if (izabraneZvezdice < 1 || slanjeOceneUToku) return;
+    setSlanjeOceneUToku(true);
+    try {
+      await addDoc(collection(db, "recenzije"), {
+        zvezdice: izabraneZvezdice,
+        tekst: tekstOcene.trim(),
+        datum: danasnjiDatum(),
+        vreme_kreiranja: serverTimestamp(),
+      });
+      localStorage.setItem(POSLEDNJA_OCENA_KLJUC, String(Date.now()));
+      setOcenaPoslata(true);
+    } catch (greska) {
+      console.error("Greška pri slanju ocene:", greska);
+      alert("Došlo je do greške, pokušaj ponovo.");
+    } finally {
+      setSlanjeOceneUToku(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans antialiased text-slate-800 flex flex-col">
+    <div className="min-h-screen bg-brand-cream font-sans antialiased text-slate-800 flex flex-col">
       <Head>
         <title>{NAZIV_RESTORANA} — Naruči online</title>
         <meta
@@ -460,15 +516,15 @@ export default function Home() {
         />
       </Head>
 
-      <header className="bg-white p-4 shadow-sm flex justify-between items-center sticky top-0 z-40">
+      <header className="bg-brand-dark p-4 shadow-sm flex justify-between items-center sticky top-0 z-40">
         <div className="max-w-7xl mx-auto w-full flex justify-between items-center">
-          <div className="relative h-9 w-36">
+          <div className="relative h-9 w-36 bg-white/95 rounded-lg px-2 py-1">
             <Image
               src={`${BASE_PATH}/images/logo.svg`}
               alt={NAZIV_RESTORANA}
               fill
               sizes="144px"
-              className="object-contain object-left"
+              className="object-contain object-left p-0.5"
               priority
             />
           </div>
@@ -476,19 +532,19 @@ export default function Home() {
           <nav className="hidden md:flex items-center gap-6">
             <button
               onClick={() => setAktivniTab("meni")}
-              className={`text-sm font-bold transition-all ${aktivniTab === "meni" ? "text-brand-dark" : "text-slate-500 hover:text-slate-700"}`}
+              className={`text-sm font-bold transition-all ${aktivniTab === "meni" ? "text-brand-gold" : "text-white/70 hover:text-white"}`}
             >
               {t.menuTab}
             </button>
             <button
               onClick={() => setAktivniTab("korpa")}
-              className={`text-sm font-bold transition-all ${aktivniTab === "korpa" ? "text-brand-dark" : "text-slate-500 hover:text-slate-700"}`}
+              className={`text-sm font-bold transition-all ${aktivniTab === "korpa" ? "text-brand-gold" : "text-white/70 hover:text-white"}`}
             >
               {t.cartTab} {brojStavkiKorpe > 0 && `(${brojStavkiKorpe})`}
             </button>
             <button
               onClick={() => setAktivniTab("prati")}
-              className={`text-sm font-bold transition-all ${aktivniTab === "prati" ? "text-brand-dark" : "text-slate-500 hover:text-slate-700"}`}
+              className={`text-sm font-bold transition-all ${aktivniTab === "prati" ? "text-brand-gold" : "text-white/70 hover:text-white"}`}
             >
               {t.trackTab}
             </button>
@@ -496,7 +552,7 @@ export default function Home() {
 
           <button
             onClick={() => setJezik(jezik === "sr" ? "en" : "sr")}
-            className="text-xs font-black bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg border border-slate-200 transition-all uppercase"
+            className="text-xs font-black bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg border border-white/20 transition-all uppercase"
             aria-label="Promeni jezik"
           >
             {jezik === "sr" ? "EN" : "SR"}
@@ -650,7 +706,9 @@ export default function Home() {
                   <div className="flex justify-between text-slate-500">
                     <span>{t.delivery}:</span>
                     <span className="font-bold">
-                      {trosakDostave === 0 ? "0 RSD" : `${trosakDostave} RSD`}
+                      {trosakDostave === 0
+                        ? "0 RSD 🎉"
+                        : `${trosakDostave} RSD`}
                     </span>
                   </div>
                   {trosakDostave > 0 && (
@@ -878,6 +936,70 @@ export default function Home() {
         </div>
       )}
 
+      {modalOcenaOtvoren && (
+        <div
+          className="fixed inset-0 bg-black/40 z-50 flex items-end md:items-center justify-center"
+          onClick={() => setModalOcenaOtvoren(false)}
+        >
+          <div
+            className="bg-white w-full max-w-md md:rounded-3xl rounded-t-3xl p-6 space-y-4 shadow-2xl text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-end">
+              <button
+                onClick={() => setModalOcenaOtvoren(false)}
+                className="text-slate-500 hover:text-slate-600 font-bold text-xl p-1"
+                aria-label="Zatvori"
+              >
+                ✕
+              </button>
+            </div>
+
+            {jeOcenaZakljucana() && !ocenaPoslata ? (
+              <p className="text-sm text-slate-600 py-6">
+                {t.reviewAlreadyDone}
+              </p>
+            ) : ocenaPoslata ? (
+              <p className="text-lg font-bold text-brand-dark py-6">
+                {t.reviewThanks} 🎉
+              </p>
+            ) : (
+              <>
+                <h3 className="text-lg font-black text-brand-dark -mt-6">
+                  {t.reviewModalTitle}
+                </h3>
+                <div className="flex justify-center gap-2">
+                  {[1, 2, 3, 4, 5].map((broj) => (
+                    <button
+                      key={broj}
+                      onClick={() => setIzabraneZvezdice(broj)}
+                      aria-label={`${broj} zvezdica`}
+                      className={`text-4xl transition-all ${broj <= izabraneZvezdice ? "text-brand-gold" : "text-slate-300"}`}
+                    >
+                      {broj <= izabraneZvezdice ? "★" : "☆"}
+                    </button>
+                  ))}
+                </div>
+                <textarea
+                  value={tekstOcene}
+                  onChange={(e) => setTekstOcene(e.target.value)}
+                  placeholder={t.reviewTextPlaceholder}
+                  rows={3}
+                  className="w-full border border-slate-200 rounded-xl p-3 text-base resize-none focus:outline-none focus:border-brand-dark"
+                />
+                <button
+                  onClick={posaljiOcenu}
+                  disabled={izabraneZvezdice < 1 || slanjeOceneUToku}
+                  className="w-full bg-brand-dark disabled:bg-slate-300 text-white font-bold p-3.5 rounded-xl text-sm hover:bg-brand-dark-hover transition-all"
+                >
+                  {slanjeOceneUToku ? "..." : t.reviewSubmit}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {aktivniTab === "meni" && korpa.length > 0 && (
         <button
           onClick={() => setAktivniTab("korpa")}
@@ -892,21 +1014,21 @@ export default function Home() {
       )}
 
       {/* Bottom tab bar - samo mobilni; desktop koristi header nav gore */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 py-2 px-4 flex justify-around items-center shadow-lg z-40">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-brand-dark border-t border-white/10 py-2 px-4 flex justify-around items-center shadow-lg z-40">
         <button
           onClick={() => setAktivniTab("meni")}
-          className={`flex flex-col items-center gap-0.5 ${aktivniTab === "meni" ? "text-brand-dark" : "text-slate-500"}`}
+          className={`flex flex-col items-center gap-0.5 ${aktivniTab === "meni" ? "text-brand-gold" : "text-white/60"}`}
         >
           <IkonicaMeni aktivna={aktivniTab === "meni"} />
           <span className="text-[10px] font-bold">{t.menuTab}</span>
         </button>
         <button
           onClick={() => setAktivniTab("korpa")}
-          className={`flex flex-col items-center gap-0.5 relative ${aktivniTab === "korpa" ? "text-brand-dark" : "text-slate-500"}`}
+          className={`flex flex-col items-center gap-0.5 relative ${aktivniTab === "korpa" ? "text-brand-gold" : "text-white/60"}`}
         >
           <IkonicaKorpa aktivna={aktivniTab === "korpa"} />
           {brojStavkiKorpe > 0 && (
-            <span className="absolute -top-1 right-1.5 bg-emerald-600 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+            <span className="absolute -top-1 right-1.5 bg-brand-gold text-brand-dark text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
               {brojStavkiKorpe}
             </span>
           )}
@@ -914,7 +1036,7 @@ export default function Home() {
         </button>
         <button
           onClick={() => setAktivniTab("prati")}
-          className={`flex flex-col items-center gap-0.5 ${aktivniTab === "prati" ? "text-brand-dark" : "text-slate-500"}`}
+          className={`flex flex-col items-center gap-0.5 ${aktivniTab === "prati" ? "text-brand-gold" : "text-white/60"}`}
         >
           <IkonicaPrati aktivna={aktivniTab === "prati"} />
           <span className="text-[10px] font-bold">{t.trackTab}</span>
@@ -971,17 +1093,15 @@ export default function Home() {
               {KONTAKT_TELEFON}
             </a>
           </div>
-          <a
-            href={GOOGLE_RECENZIJA_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-xs font-bold text-amber-600 hover:text-amber-700 transition-all"
+          <button
+            onClick={otvoriModalOcene}
+            className="flex items-center gap-1.5 text-xs font-bold text-brand-gold hover:text-brand-gold-hover transition-all"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 2l2.9 6.5L22 9.3l-5 4.9L18.2 22 12 18.3 5.8 22 7 14.2l-5-4.9 7.1-.8z" />
             </svg>
             {t.reviewUs}
-          </a>
+          </button>
           <a
             href={SAJT_ILICODE}
             target="_blank"
