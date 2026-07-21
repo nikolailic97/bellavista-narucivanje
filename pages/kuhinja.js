@@ -23,6 +23,14 @@ export default function KuhinjaStranica() {
     zatvaranjeUToku,
   } = useInternoOsoblje(["kuhinja", "admin"]);
 
+  // Kad kuhinja zatvori radni dan, to znači da je smena gotova - automatski
+  // izlogujemo (samo ako je zatvaranje stvarno uspelo, ne i na otkazivanje
+  // potvrde ili "nema šta da se arhivira").
+  const zatvoriDanIIzloguj = async () => {
+    const uspesno = await zatvoriPoslovniDan();
+    if (uspesno) hendlajOdjavu();
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 font-sans antialiased text-slate-800">
       <Head>
@@ -65,7 +73,7 @@ export default function KuhinjaStranica() {
               sadaTick={sadaTick}
               naNapredujStatus={napredujStatus}
               naAzurirajVreme={azurirajVreme}
-              naZatvoriDan={zatvoriPoslovniDan}
+              naZatvoriDan={zatvoriDanIIzloguj}
               zatvaranjeUToku={zatvaranjeUToku}
               mozeMenjatiVreme
             />

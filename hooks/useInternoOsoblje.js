@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   signInWithEmailAndPassword,
   onAuthStateChanged,
@@ -21,6 +21,35 @@ import { auth, db } from "../lib/firebase";
 import { REDOSLED_STATUSA } from "../lib/constants";
 import { danasnjiDatum } from "../lib/pomocne";
 import { NAZIV_JELA_SR } from "../lib/jelovnik";
+
+// Zvono za novu porudžbinu - generisano direktno u kodu (Web Audio API), bez
+// posebnog audio fajla. Dva brza "ding" tona da bude upadljivo u bučnoj kuhinji.
+function odsviracZvonce() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AudioCtx();
+    const sada = ctx.currentTime;
+
+    const odsviracJedanDing = (pocetak) => {
+      const oscilator = ctx.createOscillator();
+      const pojacalo = ctx.createGain();
+      oscilator.type = "sine";
+      oscilator.frequency.setValueAtTime(1046.5, pocetak); // C6 - svetao, prodoran ton
+      pojacalo.gain.setValueAtTime(0, pocetak);
+      pojacalo.gain.linearRampToValueAtTime(0.9, pocetak + 0.02);
+      pojacalo.gain.exponentialRampToValueAtTime(0.001, pocetak + 0.8);
+      oscilator.connect(pojacalo);
+      pojacalo.connect(ctx.destination);
+      oscilator.start(pocetak);
+      oscilator.stop(pocetak + 0.85);
+    };
+
+    odsviracJedanDing(sada);
+    odsviracJedanDing(sada + 0.35);
+  } catch (greska) {
+    console.error("Greška pri puštanju zvuka za novu porudžbinu:", greska);
+  }
+}
 
 // dozvoljeneUloge: npr. ['kuhinja','admin'] za /kuhinja, ili ['admin'] za /admin
 // porukaZabranjenogPristupa: tekst koji se prikaže ako se uloguje nalog koji nema pristup ovoj strani
@@ -64,11 +93,13 @@ export function useInternoOsoblje(dozvoljeneUloge, porukaZabranjenogPristupa) {
   }, []);
 
   // ---- Realtime kuhinjska tabla (aktivna dok god je nalog autorizovan za ovu stranicu) ----
+  const prviUcitanRef = useRef(true);
   useEffect(() => {
     if (!imaPristup) {
       setPorudzbine([]);
       return;
     }
+    prviUcitanRef.current = true;
     const q = query(
       collection(db, "porudzbine"),
       where("datum", "==", danasnjiDatum()),
@@ -77,8 +108,20 @@ export function useInternoOsoblje(dozvoljeneUloge, porukaZabranjenogPristupa) {
     );
     const odjava = onSnapshot(
       q,
-      (snap) =>
-        setPorudzbine(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      (snap) => {
+        setPorudzbine(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        // Preskoči zvuk na prvo učitavanje (sve postojeće porudžbine se tada
+        // "dodaju" u listu, to nije nova porudžbina) - samo na STVARNO nove
+        // dokumente koji stignu dok je stranica već otvorena.
+        if (prviUcitanRef.current) {
+          prviUcitanRef.current = false;
+        } else {
+          const imaNovih = snap
+            .docChanges()
+            .some((promena) => promena.type === "added");
+          if (imaNovih) odsviracZvonce();
+        }
+      },
       (greska) => console.error("Greška pri praćenju porudžbina:", greska),
     );
     return () => odjava();
@@ -167,13 +210,13 @@ export function useInternoOsoblje(dozvoljeneUloge, porukaZabranjenogPristupa) {
   // sme se pozvati više puta istog dana, npr. ako stignu nove porudžbine
   // nakon prvog zatvaranja, ništa se ne gubi) + batch brisanje (≤500 po paketu) ----
   const zatvoriPoslovniDan = async () => {
-    if (zatvaranjeUToku) return;
+    if (zatvaranjeUToku) return false;
     if (
       !window.confirm(
         "Da li si siguran? Sve trenutne porudžbine za danas će biti arhivirane i obrisane.",
       )
     )
-      return;
+      return false;
     setZatvaranjeUToku(true);
     try {
       const q = query(
@@ -186,7 +229,7 @@ export function useInternoOsoblje(dozvoljeneUloge, porukaZabranjenogPristupa) {
         alert(
           "Nema porudžbina za arhiviranje (dan je već zatvoren i nema novih porudžbina od tada).",
         );
-        return;
+        return false;
       }
 
       let ukupnoPorudzbina = 0;
@@ -239,9 +282,11 @@ export function useInternoOsoblje(dozvoljeneUloge, porukaZabranjenogPristupa) {
       }
 
       alert(`Arhivirano ${ukupnoPorudzbina} porudžbina.`);
+      return true;
     } catch (greska) {
       console.error("Greška pri zatvaranju poslovnog dana:", greska);
       alert("Došlo je do greške. Pokušaj ponovo.");
+      return false;
     } finally {
       setZatvaranjeUToku(false);
     }
