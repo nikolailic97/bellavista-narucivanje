@@ -732,9 +732,7 @@ export default function Home() {
                   <div className="flex justify-between text-slate-500">
                     <span>{t.delivery}:</span>
                     <span className="font-bold">
-                      {trosakDostave === 0
-                        ? "0 RSD 🎉"
-                        : `${trosakDostave} RSD`}
+                      {trosakDostave === 0 ? "0 RSD" : `${trosakDostave} RSD`}
                     </span>
                   </div>
                   {trosakDostave > 0 && (
@@ -997,7 +995,7 @@ export default function Home() {
               </p>
             ) : ocenaPoslata ? (
               <p className="text-lg font-bold text-brand-dark py-6">
-                {t.reviewThanks} 🎉
+                {t.reviewThanks}
               </p>
             ) : (
               <>
