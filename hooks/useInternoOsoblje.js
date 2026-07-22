@@ -23,11 +23,35 @@ import { danasnjiDatum } from "../lib/pomocne";
 import { NAZIV_JELA_SR } from "../lib/jelovnik";
 
 // Zvono za novu porudžbinu - generisano direktno u kodu (Web Audio API), bez
-// posebnog audio fajla. Dva brza "ding" tona da bude upadljivo u bučnoj kuhinji.
+// posebnog audio fajla. JEDAN trajni AudioContext za celu sesiju (ne nov
+// svaki put) - browseri blokiraju zvuk dok ne postoji prava korisnička
+// interakcija, a "otključani" kontekst ostaje otključan dok god je isti objekat.
+let deljeniAudioKontekst = null;
+
+function dobijAudioKontekst() {
+  if (!deljeniAudioKontekst) {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    deljeniAudioKontekst = new AudioCtx();
+  }
+  return deljeniAudioKontekst;
+}
+
+// Pozvati OBAVEZNO iz prave korisničke interakcije (npr. klik na "Prijavi se")
+// da se zvuk otključa za ostatak sesije - inače prvi pokušaj puštanja zvuka
+// (kad stigne porudžbina, bez direktnog klika u tom trenutku) ostaje nem.
+function otkljucajZvuk() {
+  try {
+    const ctx = dobijAudioKontekst();
+    if (ctx.state === "suspended") ctx.resume();
+  } catch (greska) {
+    console.error("Greška pri otključavanju zvuka:", greska);
+  }
+}
+
 function odsviracZvonce() {
   try {
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    const ctx = new AudioCtx();
+    const ctx = dobijAudioKontekst();
+    if (ctx.state === "suspended") ctx.resume();
     const sada = ctx.currentTime;
 
     const odsviracJedanDing = (pocetak) => {
@@ -66,6 +90,24 @@ export function useInternoOsoblje(dozvoljeneUloge, porukaZabranjenogPristupa) {
   const [zatvaranjeUToku, setZatvaranjeUToku] = useState(false);
 
   const imaPristup = Boolean(uloga && dozvoljeneUloge.includes(uloga));
+
+  // ---- Fallback otključavanje zvuka - ako je sesija već aktivna (tablet
+  // ostaje ulogovan ceo dan), login klik se ne dešava ponovo, pa hvatamo
+  // PRVU interakciju bilo gde na stranici umesto toga. Uklanja se sam posle
+  // prvog okidanja. ----
+  useEffect(() => {
+    const otkljucaj = () => {
+      otkljucajZvuk();
+      document.removeEventListener("click", otkljucaj);
+      document.removeEventListener("touchstart", otkljucaj);
+    };
+    document.addEventListener("click", otkljucaj);
+    document.addEventListener("touchstart", otkljucaj);
+    return () => {
+      document.removeEventListener("click", otkljucaj);
+      document.removeEventListener("touchstart", otkljucaj);
+    };
+  }, []);
 
   // ---- Firebase Auth state + custom claim uloga ----
   useEffect(() => {
@@ -140,6 +182,7 @@ export function useInternoOsoblje(dozvoljeneUloge, porukaZabranjenogPristupa) {
     e.preventDefault();
     setGreskaPristupa("");
     if (!email || pin.length < 6 || prijavaUToku) return;
+    otkljucajZvuk(); // klik na dugme = prava korisnička interakcija, otključava zvuk za ostatak sesije
     setPrijavaUToku(true);
     try {
       await signInWithEmailAndPassword(auth, email.trim(), pin);
