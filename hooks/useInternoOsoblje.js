@@ -54,22 +54,34 @@ function odsviracZvonce() {
     if (ctx.state === "suspended") ctx.resume();
     const sada = ctx.currentTime;
 
+    // Kompresor sprečava da glasniji, složeniji ton (osnovni ton + harmonik)
+    // izobliči zvuk - omogućava da guramo jačinu bez "pucanja".
+    const kompresor = ctx.createDynamicsCompressor();
+    kompresor.threshold.setValueAtTime(-18, sada);
+    kompresor.ratio.setValueAtTime(6, sada);
+    kompresor.connect(ctx.destination);
+
     const odsviracJedanDing = (pocetak) => {
-      const oscilator = ctx.createOscillator();
-      const pojacalo = ctx.createGain();
-      oscilator.type = "sine";
-      oscilator.frequency.setValueAtTime(1046.5, pocetak); // C6 - svetao, prodoran ton
-      pojacalo.gain.setValueAtTime(0, pocetak);
-      pojacalo.gain.linearRampToValueAtTime(0.9, pocetak + 0.02);
-      pojacalo.gain.exponentialRampToValueAtTime(0.001, pocetak + 0.8);
-      oscilator.connect(pojacalo);
-      pojacalo.connect(ctx.destination);
-      oscilator.start(pocetak);
-      oscilator.stop(pocetak + 0.85);
+      // Osnovni ton (C6) + harmonik oktavu iznad - zajedno zvuče punije/glasnije
+      [1046.5, 2093].forEach((frekvencija, i) => {
+        const oscilator = ctx.createOscillator();
+        const pojacalo = ctx.createGain();
+        oscilator.type = "sine";
+        oscilator.frequency.setValueAtTime(frekvencija, pocetak);
+        const vrhJacine = i === 0 ? 1 : 0.5;
+        pojacalo.gain.setValueAtTime(0, pocetak);
+        pojacalo.gain.linearRampToValueAtTime(vrhJacine, pocetak + 0.02);
+        pojacalo.gain.exponentialRampToValueAtTime(0.001, pocetak + 0.9);
+        oscilator.connect(pojacalo);
+        pojacalo.connect(kompresor);
+        oscilator.start(pocetak);
+        oscilator.stop(pocetak + 0.95);
+      });
     };
 
     odsviracJedanDing(sada);
-    odsviracJedanDing(sada + 0.35);
+    odsviracJedanDing(sada + 0.32);
+    odsviracJedanDing(sada + 0.64);
   } catch (greska) {
     console.error("Greška pri puštanju zvuka za novu porudžbinu:", greska);
   }

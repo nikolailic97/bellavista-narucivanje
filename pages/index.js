@@ -6,11 +6,8 @@ import {
   doc,
   addDoc,
   getDoc,
-  query,
-  where,
   runTransaction,
   serverTimestamp,
-  getCountFromServer,
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import {
@@ -34,18 +31,6 @@ const SAJT_ILICODE = "https://nikolailic97.github.io/ilicode-studio/";
 const PRAG_BESPLATNE_DOSTAVE = 1600;
 const MIN_VIDLJIVOSTI_POSLE_ZAVRSETKA = 10; // minuti - koliko dugo kupac vidi/pretražuje gotovu porudžbinu
 const CENA_DOSTAVE = 200;
-
-// Konstante za procenu vremena pripreme - lako se štimuju kasnije
-const MNOZIOCI_GUZVE = [
-  { doAktivnih: 5, mnozilac: 1 },
-  { doAktivnih: 10, mnozilac: 1.3 },
-  { doAktivnih: Infinity, mnozilac: 1.6 },
-];
-
-function izracunajMnozilacGuzve(brojAktivnih) {
-  const stepenik = MNOZIOCI_GUZVE.find((s) => brojAktivnih <= s.doAktivnih);
-  return stepenik ? stepenik.mnozilac : 1;
-}
 
 // Status tekst za KUPCA - prati jezik toggle. Interno "zavrseno" znači da je
 // kuhinja gotova i porudžbina je predata dostavljaču - kupcu to prikazujemo
@@ -214,7 +199,6 @@ export default function Home() {
   const [unetiKod, setUnetiKod] = useState("");
   const [statusPorudzbine, setStatusPorudzbine] = useState(null);
   const [porudzbinaNijeNadjena, setPorudzbinaNijeNadjena] = useState(false);
-  const [preostaloVreme, setPreostaloVreme] = useState(0); // interno rate-limitovanje, NE prikazuje se korisniku
   const [preostaloCekanjeSek, setPreostaloCekanjeSek] = useState(null);
   const [slanjeUToku, setSlanjeUToku] = useState(false);
   const [osvezavanjeUToku, setOsvezavanjeUToku] = useState(false);
@@ -232,17 +216,13 @@ export default function Home() {
     if (sacuvan) setAktivniIdPorudzbine(sacuvan);
   }, []);
 
-  // ---- Interni cooldown tajmer (180s) - koristimo ga da zaštitimo Firestore
-  // troškove od prečestih poziva, ali ovo se NIKAD ne prikazuje korisniku ----
-  useEffect(() => {
-    if (preostaloVreme <= 0) return;
-    const interval = setInterval(() => setPreostaloVreme((p) => p - 1), 1000);
-    return () => clearInterval(interval);
-  }, [preostaloVreme]);
-
   // ---- Procena preostalog čekanja - lokalno tiktakanje, bez Firestore poziva ----
   useEffect(() => {
-    if (!statusPorudzbine || !statusPorudzbine.vreme_kreiranja) {
+    if (
+      !statusPorudzbine ||
+      !statusPorudzbine.vreme_kreiranja ||
+      !statusPorudzbine.trajanje_procena_min
+    ) {
       setPreostaloCekanjeSek(null);
       return;
     }
@@ -325,37 +305,15 @@ export default function Home() {
     setKorpa((prev) => prev.filter((item) => item.id_stavke !== id_stavke));
   };
 
-  // ---- Procena trajanja pripreme: bazno vreme najsporije stavke x množilac gužve ----
-  const izracunajTrajanjeProcene = async () => {
-    const bazno = Math.max(...korpa.map((item) => item.vreme_pripreme || 15));
-    let mnozilac = 1;
-    try {
-      // Gost nema pravo čitanja "porudzbine" (štiti ime/telefon/adresu ostalih
-      // kupaca) - zato brojimo preko javne "status_porudzbine" kolekcije, koja
-      // ima samo status/vreme, bez ličnih podataka.
-      const q = query(
-        collection(db, "status_porudzbine"),
-        where("datum", "==", danasnjiDatum()),
-        where("status", "in", ["novo", "u_pripremi"]),
-      );
-      const rezultat = await getCountFromServer(q);
-      mnozilac = izracunajMnozilacGuzve(rezultat.data().count);
-    } catch (greska) {
-      console.error(
-        "Greška pri proveri gužve, koristim podrazumevani množilac:",
-        greska,
-      );
-    }
-    return Math.round(bazno * mnozilac);
-  };
-
   // ---- Slanje porudžbine: transakcija upisuje pun dokument + javni status dokument ----
   const posaljiPorudzbinu = async (e) => {
     e.preventDefault();
     if (korpa.length === 0 || slanjeUToku) return;
     setSlanjeUToku(true);
     try {
-      const trajanjeProcena = await izracunajTrajanjeProcene();
+      // Procenjeno vreme se više ne računa automatski (gužva/množilac) - sad
+      // ga ručno postavlja kuhinja/admin preko "Sačuvaj vreme", jer bolje znaju
+      // stvarnu situaciju u restoranu. Kupac dotad vidi "-" umesto procene.
       let finalniBroj = "";
 
       await runTransaction(db, async (tx) => {
@@ -384,22 +342,31 @@ export default function Home() {
           status: "novo",
           datum: danasnjiDatum(),
           vreme_kreiranja: serverTimestamp(),
-          trajanje_procena_min: trajanjeProcena,
+          trajanje_procena_min: 0,
         });
         tx.set(statusRef, {
           status: "novo",
           datum: danasnjiDatum(),
           vreme_kreiranja: serverTimestamp(),
-          trajanje_procena_min: trajanjeProcena,
+          trajanje_procena_min: 0,
         });
       });
 
       localStorage.setItem("id_porudzbine", finalniBroj);
       setAktivniIdPorudzbine(finalniBroj);
-      setStatusPorudzbine(null);
+      // Odmah prikaži "Primljena" status - znamo da je tako jer smo ga upravo
+      // kreirali, ne treba da kupac gleda prazno "—" dok traje fetch. Realni
+      // podaci (sa serverskim vremenom) stižu odmah posle preko fetch-a ispod.
+      setStatusPorudzbine({
+        status: "novo",
+        vreme_kreiranja: { toMillis: () => Date.now() },
+        trajanje_procena_min: 0,
+      });
+      setPorudzbinaNijeNadjena(false);
       setKorpa([]);
       setForma({ ime: "", telefon: "", adresa: "", napomena: "" });
       setAktivniTab("prati");
+      osveziStatusPorudzbine(finalniBroj);
     } catch (greska) {
       console.error("Greška prilikom slanja porudžbine:", greska);
       alert("Došlo je do greške prilikom slanja porudžbine. Pokušaj ponovo.");
@@ -409,11 +376,11 @@ export default function Home() {
   };
 
   // ---- Osvežavanje statusa - i dalje interno limitirano na 180s (štiti
-  // Firestore troškove), ali se to nikad ne pokazuje korisniku ----
-  const osveziStatusPorudzbine = async (kod, prisilno = false) => {
+  // Osvežavanje statusa - svaki klik na "Prati" uvek učitava sveže podatke
+  // (ručni klik je sam po sebi prirodno ograničenje, ne treba dodatni keš).
+  const osveziStatusPorudzbine = async (kod) => {
     const ciljniKod = kod || aktivniIdPorudzbine;
     if (!ciljniKod || osvezavanjeUToku) return;
-    if (!prisilno && preostaloVreme > 0) return;
     setOsvezavanjeUToku(true);
     try {
       const snap = await getDoc(doc(db, "status_porudzbine", ciljniKod));
@@ -444,7 +411,6 @@ export default function Home() {
           localStorage.removeItem("id_porudzbine");
         }
       }
-      setPreostaloVreme(180);
     } catch (greska) {
       console.error("Greška pri osvežavanju statusa:", greska);
     } finally {
@@ -456,22 +422,12 @@ export default function Home() {
     e.preventDefault();
     if (!unetiKod || osvezavanjeUToku) return;
     const kod = unetiKod;
-    const noviKod = kod !== aktivniIdPorudzbine;
     setUnetiKod("");
-    if (noviKod) {
-      // druga porudžbina - učitaj sve ispočetka, uvek prikaži odmah (force)
-      setStatusPorudzbine(null);
-      setPorudzbinaNijeNadjena(false);
-      localStorage.setItem("id_porudzbine", kod);
-      setAktivniIdPorudzbine(kod);
-      osveziStatusPorudzbine(kod, true);
-    } else if (preostaloVreme <= 0) {
-      // ista porudžbina, i interni 3-min keš je istekao - tiho osveži
-      // (korisnik ne vidi da postoji ikakav keš/limit, samo dobije nove podatke)
-      osveziStatusPorudzbine(kod, true);
-    }
-    // ista porudžbina i keš još važi (< 3 min od poslednje provere) - ništa ne
-    // diramo, ostaje prikazano ono što je već učitano
+    setStatusPorudzbine(null);
+    setPorudzbinaNijeNadjena(false);
+    localStorage.setItem("id_porudzbine", kod);
+    setAktivniIdPorudzbine(kod);
+    osveziStatusPorudzbine(kod);
   };
 
   const otvoriModalOcene = () => {
