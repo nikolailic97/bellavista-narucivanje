@@ -814,7 +814,19 @@ export default function Home() {
                   <span className="text-xs text-slate-500 block mb-0.5">
                     {t.statusLabel}:
                   </span>
-                  <span className="font-extrabold text-amber-600">
+                  <span
+                    className={`font-extrabold ${
+                      !statusPorudzbine
+                        ? "text-slate-400"
+                        : statusPorudzbine.status === "novo"
+                          ? "text-orange-500"
+                          : statusPorudzbine.status === "u_pripremi"
+                            ? "text-blue-500"
+                            : statusPorudzbine.status === "spremno_za_dostavu"
+                              ? "text-emerald-600"
+                              : "text-indigo-600"
+                    }`}
+                  >
                     {statusPorudzbine
                       ? PREVOD_STATUSA[jezik][statusPorudzbine.status]
                       : "—"}
