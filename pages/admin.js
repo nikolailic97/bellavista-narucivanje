@@ -23,6 +23,7 @@ import {
 import { db } from "../lib/firebase";
 import { danasnjiDatum } from "../lib/pomocne";
 import { NAZIV_STATUSA } from "../lib/constants";
+import { NAZIV_JELA_SR } from "../lib/jelovnik";
 import { useInternoOsoblje } from "../hooks/useInternoOsoblje";
 import KuhinjskaTabla from "../components/KuhinjskaTabla";
 import PinPrijava from "../components/PinPrijava";
@@ -68,41 +69,123 @@ export default function AdminStranica() {
   const [otvorenaRecenzija, setOtvorenaRecenzija] = useState(null);
 
   // ---- Admin analitika: čita samo izveštaje, ručno + na promenu perioda ----
+  // Agregira niz porudzbine dokumenata u {total_orders, total_revenue, top_items}
+  // - isti obrazac kao pri "Zatvori poslovni dan", za PRIKAZ pre arhiviranja.
+  const agregirajPorudzbine = (dokumenti) => {
+    let total_orders = 0;
+    let total_revenue = 0;
+    const top_items = {};
+    dokumenti.forEach((podaci) => {
+      total_orders += 1;
+      total_revenue += podaci.cena_ukupno || 0;
+      (podaci.stavke || []).forEach((stavka) => {
+        const naziv = NAZIV_JELA_SR[stavka.id_jela] || stavka.naziv;
+        top_items[naziv] = (top_items[naziv] || 0) + stavka.kolicina;
+      });
+    });
+    return { total_orders, total_revenue, top_items };
+  };
+
+  const spojiIzvestaje = (a, b) => {
+    const top_items = { ...(a.top_items || {}) };
+    Object.entries(b.top_items || {}).forEach(([naziv, kolicina]) => {
+      top_items[naziv] = (top_items[naziv] || 0) + kolicina;
+    });
+    return {
+      total_orders: (a.total_orders || 0) + (b.total_orders || 0),
+      total_revenue: (a.total_revenue || 0) + (b.total_revenue || 0),
+      top_items,
+    };
+  };
+
+  // Žive (još nearhivirane) porudžbine za danas - da se vide odmah, bez
+  // čekanja na "Zatvori poslovni dan".
+  const ucitajZivePodatkeZaDanas = async () => {
+    const q = query(
+      collection(db, "porudzbine"),
+      where("datum", "==", danasnjiDatum()),
+    );
+    const snap = await getDocs(q);
+    return agregirajPorudzbine(snap.docs.map((d) => d.data()));
+  };
+
   const ucitajAnalitiku = async (period) => {
     setAnalitikaUcitavanje(true);
     try {
+      const danasStr = danasnjiDatum();
+
       if (period === "danas") {
-        const danas = danasnjiDatum();
-        const snap = await getDoc(doc(db, "izvestaji", danas));
-        setAnalitikaPodaci(
-          snap.exists() ? [{ datum: danas, ...snap.data() }] : [],
-        );
+        const snap = await getDoc(doc(db, "izvestaji", danasStr));
+        const arhivirano = snap.exists()
+          ? snap.data()
+          : { total_orders: 0, total_revenue: 0, top_items: {} };
+        const zivo = await ucitajZivePodatkeZaDanas();
+        setAnalitikaPodaci([
+          { datum: danasStr, ...spojiIzvestaje(arhivirano, zivo) },
+        ]);
         return;
       }
-      let q;
-      if (period === "nedelja") {
-        q = query(
+
+      if (period === "nedelja" || period === "mesec") {
+        const brojDana = period === "nedelja" ? 7 : 30;
+        const datumi = [];
+        for (let i = 0; i < brojDana; i++) {
+          const d = new Date();
+          d.setDate(d.getDate() - i);
+          datumi.push(d.toISOString().slice(0, 10));
+        }
+        datumi.reverse(); // hronološki, najstariji prvo
+
+        const q = query(
           collection(db, "izvestaji"),
-          orderBy(documentId(), "desc"),
-          limit(7),
+          where(documentId(), "in", datumi),
         );
-      } else if (period === "mesec") {
-        q = query(
-          collection(db, "izvestaji"),
-          orderBy(documentId(), "desc"),
-          limit(30),
-        );
-      } else {
-        const godina = new Date().getFullYear();
-        q = query(
-          collection(db, "izvestaji"),
-          where(documentId(), ">=", `${godina}-01-01`),
-          where(documentId(), "<=", `${godina}-12-31`),
-          orderBy(documentId(), "asc"),
-        );
+        const snap = await getDocs(q);
+        const mapaIzvestaja = {};
+        snap.docs.forEach((d) => {
+          mapaIzvestaja[d.id] = d.data();
+        });
+
+        const zivoDanas = await ucitajZivePodatkeZaDanas();
+
+        const podaci = datumi.map((datum) => {
+          const bazni = mapaIzvestaja[datum] || {
+            total_orders: 0,
+            total_revenue: 0,
+            top_items: {},
+          };
+          if (datum === danasStr) {
+            return { datum, ...spojiIzvestaje(bazni, zivoDanas) };
+          }
+          return { datum, ...bazni };
+        });
+        setAnalitikaPodaci(podaci);
+        return;
       }
+
+      // godina
+      const godina = new Date().getFullYear();
+      const q = query(
+        collection(db, "izvestaji"),
+        where(documentId(), ">=", `${godina}-01-01`),
+        where(documentId(), "<=", `${godina}-12-31`),
+        orderBy(documentId(), "asc"),
+      );
       const snap = await getDocs(q);
       const podaci = snap.docs.map((d) => ({ datum: d.id, ...d.data() }));
+
+      if (danasStr.startsWith(`${godina}-`)) {
+        const zivoDanas = await ucitajZivePodatkeZaDanas();
+        const indeks = podaci.findIndex((p) => p.datum === danasStr);
+        if (indeks >= 0) {
+          podaci[indeks] = {
+            datum: danasStr,
+            ...spojiIzvestaje(podaci[indeks], zivoDanas),
+          };
+        } else {
+          podaci.push({ datum: danasStr, ...zivoDanas });
+        }
+      }
       podaci.sort((a, b) => a.datum.localeCompare(b.datum));
       setAnalitikaPodaci(podaci);
     } catch (greska) {
@@ -604,7 +687,7 @@ export default function AdminStranica() {
                             Top 5 najprodavanijih
                           </span>
                           <ul className="space-y-2">
-                            {topPetStavki.map(([naziv, kolicina], i) => (
+                            {topPetStavki.map(([naziv], i) => (
                               <li
                                 key={naziv}
                                 className="flex items-center gap-3"
@@ -624,9 +707,6 @@ export default function AdminStranica() {
                                 </span>
                                 <span className="flex-1 text-sm font-medium text-slate-700 truncate">
                                   {naziv}
-                                </span>
-                                <span className="text-sm font-black text-brand-dark">
-                                  {kolicina}x
                                 </span>
                               </li>
                             ))}

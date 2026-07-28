@@ -85,6 +85,7 @@ const PREVODI = {
     orderNotFound: "Porudžbina sa ovim kodom ne postoji:",
     reviewUs: "Oceni nas",
     reviewModalTitle: "Kako ti se svidela porudžbina?",
+    reviewPromptTitle: "Kako ti se dopala hrana? Oceni nas!",
     reviewTextPlaceholder: "Reci nam više (opciono)",
     reviewSubmit: "Pošalji ocenu",
     reviewThanks: "Hvala na oceni!",
@@ -123,6 +124,7 @@ const PREVODI = {
     orderNotFound: "No order found with this code:",
     reviewUs: "Rate us",
     reviewModalTitle: "How was your order?",
+    reviewPromptTitle: "How was the food? Rate us!",
     reviewTextPlaceholder: "Tell us more (optional)",
     reviewSubmit: "Submit rating",
     reviewThanks: "Thanks for the feedback!",
@@ -158,7 +160,9 @@ function IkonicaKorpa({ aktivna }) {
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <path d="M6 8V6a6 6 0 0112 0v2M4 8h16l-1.2 12.2a2 2 0 01-2 1.8H7.2a2 2 0 01-2-1.8L4 8z" />
+      <circle cx="9" cy="21" r="1" />
+      <circle cx="19" cy="21" r="1" />
+      <path d="M1.5 2h3l2.4 12.6a2 2 0 002 1.6h9.4a2 2 0 002-1.6L21.5 6H5" />
     </svg>
   );
 }
@@ -846,6 +850,23 @@ export default function Home() {
                           : `~${Math.ceil(preostaloCekanjeSek / 60)} min`}
                     </span>
                   </div>
+                )}
+
+                {statusPorudzbine && statusPorudzbine.status === "zavrseno" && (
+                  <button
+                    onClick={otvoriModalOcene}
+                    className="w-full bg-brand-gold hover:bg-brand-gold-hover text-white font-bold p-4 rounded-xl text-sm transition-all shadow-md flex items-center justify-center gap-2"
+                  >
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                    >
+                      <path d="M12 2l2.9 6.5L22 9.3l-5 4.9L18.2 22 12 18.3 5.8 22 7 14.2l-5-4.9 7.1-.8z" />
+                    </svg>
+                    {t.reviewPromptTitle}
+                  </button>
                 )}
               </div>
             )}
