@@ -37,7 +37,10 @@ service cloud.firestore {
     // Dnevni izveštaji — poverljivi podaci o prihodu, čita SAMO admin (Owner
     // Analytics). Piše osoblje (kuhinja ili admin preko "Zatvori poslovni dan").
     match /izvestaji/{datum} {
-      allow read: if jeUloga('admin');
+      // Bilo koje osoblje sme da čita - kuhinja poziva "Zatvori poslovni dan"
+      // koje sad koristi transakciju (pročitaj-spoji-upiši) da ispravno
+      // sabira po stavkama bez rizika da izgubi postojeće podatke.
+      allow read: if jeOsoblje();
       allow write: if jeOsoblje();
     }
 

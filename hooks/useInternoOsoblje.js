@@ -7,15 +7,14 @@ import {
 import {
   collection,
   doc,
-  getDoc,
   getDocs,
   query,
   where,
   orderBy,
   onSnapshot,
   writeBatch,
+  runTransaction,
   serverTimestamp,
-  increment,
 } from "firebase/firestore";
 import { auth, db } from "../lib/firebase";
 import { REDOSLED_STATUSA } from "../lib/constants";
@@ -302,28 +301,33 @@ export function useInternoOsoblje(dozvoljeneUloge, porukaZabranjenogPristupa) {
         });
       });
 
-      // increment() radi i ako polje/dokument još ne postoji (tretira ga kao
-      // 0) - zato ovo bezbedno radi i za prvo I za svako sledeće zatvaranje
-      // istog dana, bez potrebe da se prethodno pročita postojeći izveštaj
-      // (kuhinja nema pravo čitanja izvestaji, samo admin - increment to zaobilazi).
-      const azuriranje = {
-        total_orders: increment(ukupnoPorudzbina),
-        total_revenue: increment(ukupanPrihod),
-        poslednje_azuriranje: serverTimestamp(),
-      };
-      Object.entries(najprodavanije).forEach(([naziv, kolicina]) => {
-        azuriranje[`top_items.${naziv}`] = increment(kolicina);
-      });
-
+      // Transakcija: pročitaj postojeći izveštaj (ako ima), spoji nove brojke
+      // u memoriji, upiši ceo dokument. NAPOMENA: batch.set(ref, {"top_items.X": ...}, {merge:true})
+      // NE pravi ugnježdeno polje - .set() tretira ključ sa tačkom bukvalno
+      // (samo .update() parsira tačka-putanje), pa je stari pristup pravio
+      // pogrešno, pljosnato polje umesto prave mape. Transakcija ovo rešava
+      // ispravno, bez tog trika.
       const izvestajRef = doc(db, "izvestaji", danasnjiDatum());
-      const paketIzvestaja = writeBatch(db);
-      paketIzvestaja.set(izvestajRef, azuriranje, { merge: true });
-      paketIzvestaja.set(
-        doc(db, "izvestaji_status", danasnjiDatum()),
-        { zatvoren: true, zatvoren_u: serverTimestamp() },
-        { merge: true },
-      );
-      await paketIzvestaja.commit();
+      await runTransaction(db, async (tx) => {
+        const izvestajSnap = await tx.get(izvestajRef);
+        const postojeci = izvestajSnap.exists()
+          ? izvestajSnap.data()
+          : { total_orders: 0, total_revenue: 0, top_items: {} };
+        const noviTopItems = { ...(postojeci.top_items || {}) };
+        Object.entries(najprodavanije).forEach(([naziv, kolicina]) => {
+          noviTopItems[naziv] = (noviTopItems[naziv] || 0) + kolicina;
+        });
+        tx.set(izvestajRef, {
+          total_orders: (postojeci.total_orders || 0) + ukupnoPorudzbina,
+          total_revenue: (postojeci.total_revenue || 0) + ukupanPrihod,
+          top_items: noviTopItems,
+          poslednje_azuriranje: serverTimestamp(),
+        });
+        tx.set(doc(db, "izvestaji_status", danasnjiDatum()), {
+          zatvoren: true,
+          zatvoren_u: serverTimestamp(),
+        });
+      });
 
       const VELICINA_PAKETA = 250;
       for (let i = 0; i < snap.docs.length; i += VELICINA_PAKETA) {
