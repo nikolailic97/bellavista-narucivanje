@@ -21,6 +21,7 @@ import {
   JELOVNIK,
   DODACI_PO_KATEGORIJI,
   TAGOVI_INFO,
+  PODKATEGORIJE_RESTORAN,
 } from "../lib/jelovnik";
 
 // ============ TODO: ZAMENI KAD DOBIJEMO FINALNI NAZIV/LOGO ============
@@ -190,6 +191,9 @@ export default function Home() {
   const [jezik, setJezik] = useState("sr");
   const [aktivniTab, setAktivniTab] = useState("meni");
   const [selektovanaKategorija, setSelektovanaKategorija] = useState("burgeri");
+  const [selektovanaPodkategorija, setSelektovanaPodkategorija] = useState(
+    PODKATEGORIJE_RESTORAN[0].id,
+  );
   const [otvorenPanelJelo, setOtvorenPanelJelo] = useState(null);
   const [korpa, setKorpa] = useState([]);
   const [izabraniDodaci, setIzabraniDodaci] = useState([]);
@@ -565,13 +569,34 @@ export default function Home() {
               ))}
             </div>
 
+            {selektovanaKategorija === "restoran" && (
+              <div className="flex gap-2 overflow-x-auto pb-4 whitespace-nowrap">
+                {PODKATEGORIJE_RESTORAN.map((pod) => (
+                  <button
+                    key={pod.id}
+                    onClick={() => setSelektovanaPodkategorija(pod.id)}
+                    className={`px-3.5 py-1.5 rounded-full font-bold text-xs transition-all ${
+                      selektovanaPodkategorija === pod.id
+                        ? "bg-brand-gold text-white shadow-sm"
+                        : "bg-white text-slate-500 border border-slate-100"
+                    }`}
+                  >
+                    {pod[jezik]}
+                  </button>
+                ))}
+              </div>
+            )}
+
             <p className="text-xs font-bold text-emerald-600 mb-3">
               {t.freeDeliveryFrom}
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 gap-y-5 mt-2">
               {JELOVNIK.filter(
-                (j) => j.kategorija === selektovanaKategorija,
+                (j) =>
+                  j.kategorija === selektovanaKategorija &&
+                  (selektovanaKategorija !== "restoran" ||
+                    j.podkategorija === selektovanaPodkategorija),
               ).map((jelo) => (
                 <div
                   key={jelo.id}
