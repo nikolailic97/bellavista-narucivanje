@@ -224,6 +224,15 @@ export function useInternoOsoblje(dozvoljeneUloge, porukaZabranjenogPristupa) {
         azuriranjePorudzbine.vreme_zavrseno = serverTimestamp();
         azuriranjeStatusa.vreme_zavrseno = serverTimestamp();
       }
+      // Isto tako, kad porudžbina uđe u "spremno_za_dostavu" (predata
+      // vozaču/kuriru), beležimo vreme - ovo je "sigurnosna mreža" u
+      // slučaju da osoblje zaboravi da klikne finalno "Označi završeno":
+      // kupac ionako prestaje da vidi/pretražuje porudžbinu ~15min posle
+      // ovog trenutka (vidi pages/index.js osveziStatusPorudzbine).
+      if (sledeci === "spremno_za_dostavu") {
+        azuriranjePorudzbine.vreme_spremno_za_dostavu = serverTimestamp();
+        azuriranjeStatusa.vreme_spremno_za_dostavu = serverTimestamp();
+      }
       batch.update(doc(db, "porudzbine", porudzbina.id), azuriranjePorudzbine);
       batch.update(
         doc(db, "status_porudzbine", porudzbina.broj),

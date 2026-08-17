@@ -31,6 +31,7 @@ const KONTAKT_TELEFON = "+381 63 1110009"; // TODO: zameni pravim brojem
 const SAJT_ILICODE = "https://nikolailic97.github.io/ilicode-studio/";
 const PRAG_BESPLATNE_DOSTAVE = 1600;
 const MIN_VIDLJIVOSTI_POSLE_ZAVRSETKA = 10; // minuti - koliko dugo kupac vidi/pretražuje gotovu porudžbinu
+const MIN_VIDLJIVOSTI_SPREMNO_ZA_DOSTAVU = 15; // minuti - "sigurnosna mreža": ako osoblje ne klikne "zavrseno", porudžbina ionako nestaje ovoliko posle ulaska u "spremno_za_dostavu"
 const CENA_DOSTAVE = 200;
 
 // Status tekst za KUPCA - prati jezik toggle. Interno "zavrseno" znači da je
@@ -398,10 +399,20 @@ export default function Home() {
         // ~10 minuta, pa onda "nestaje" (ne postoji za njega) - staff je i
         // dalje vidi/pretražuje normalno do "Zatvori poslovni dan".
         const zavrsenoMs = vremeUMilisekundama(podaci.vreme_zavrseno);
-        const jeIstekla =
+        const jeIsteklaZavrsena =
           podaci.status === "zavrseno" &&
           zavrsenoMs &&
           Date.now() - zavrsenoMs > MIN_VIDLJIVOSTI_POSLE_ZAVRSETKA * 60000;
+        // Sigurnosna mreža: ako porudžbina uđe u "spremno_za_dostavu" (predata
+        // vozaču) i tu ostane (osoblje zaboravi da klikne finalno "završeno"),
+        // ionako nestaje kupcu ~15 minuta posle ulaska u taj status - ista
+        // logika kao gore, samo drugi status i drugo vremensko polje.
+        const spremnoMs = vremeUMilisekundama(podaci.vreme_spremno_za_dostavu);
+        const jeIsteklaSpremna =
+          podaci.status === "spremno_za_dostavu" &&
+          spremnoMs &&
+          Date.now() - spremnoMs > MIN_VIDLJIVOSTI_SPREMNO_ZA_DOSTAVU * 60000;
+        const jeIstekla = jeIsteklaZavrsena || jeIsteklaSpremna;
         if (jeIstekla) {
           setStatusPorudzbine(null);
           setPorudzbinaNijeNadjena(true);
