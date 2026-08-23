@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Head from "next/head";
 import Image from "next/image";
 import {
@@ -32,6 +32,7 @@ const SAJT_ILICODE = "https://nikolailic97.github.io/ilicode-studio/";
 const PRAG_BESPLATNE_DOSTAVE = 1600;
 const MIN_VIDLJIVOSTI_POSLE_ZAVRSETKA = 10; // minuti - koliko dugo kupac vidi/pretražuje gotovu porudžbinu
 const MIN_VIDLJIVOSTI_SPREMNO_ZA_DOSTAVU = 15; // minuti - "sigurnosna mreža": ako osoblje ne klikne "zavrseno", porudžbina ionako nestaje ovoliko posle ulaska u "spremno_za_dostavu"
+const KOD_PRETRAGA_COOLDOWN_MS = 5000; // minimalno vreme između ručnih pretraga po kodu - usporava nagađanje brojeva porudžbine (dodatno uz App Check, vidi lib/firebase.js)
 const CENA_DOSTAVE = 200;
 
 // Status tekst za KUPCA - prati jezik toggle. Interno "zavrseno" znači da je
@@ -85,6 +86,7 @@ const PREVODI = {
     trackCodeBtn: "Prati",
     orLastOrder: "ili tvoja poslednja porudžbina:",
     orderNotFound: "Porudžbina sa ovim kodom ne postoji:",
+    searchTooFast: "Sačekaj par sekundi pre nove pretrage.",
     reviewUs: "Oceni nas",
     reviewModalTitle: "Kako ti se svidela porudžbina?",
     reviewPromptTitle: "Kako ti se dopala hrana? Oceni nas!",
@@ -124,6 +126,7 @@ const PREVODI = {
     trackCodeBtn: "Track",
     orLastOrder: "or your last order:",
     orderNotFound: "No order found with this code:",
+    searchTooFast: "Please wait a few seconds before searching again.",
     reviewUs: "Rate us",
     reviewModalTitle: "How was your order?",
     reviewPromptTitle: "How was the food? Rate us!",
@@ -211,6 +214,11 @@ export default function Home() {
   const [preostaloCekanjeSek, setPreostaloCekanjeSek] = useState(null);
   const [slanjeUToku, setSlanjeUToku] = useState(false);
   const [osvezavanjeUToku, setOsvezavanjeUToku] = useState(false);
+  const [pretragaPrebrza, setPretragaPrebrza] = useState(false);
+  // useRef (ne useState!) - mora da čita najsvežiju vrednost odmah pri kliku,
+  // bez zavisnosti od re-rendera; ranije je sličan cooldown na drugom mestu
+  // pravio "stale closure" bag (klik nije radio ništa) baš zbog useState-a.
+  const poslednjaPretragaRef = useRef(0);
   const [modalOcenaOtvoren, setModalOcenaOtvoren] = useState(false);
   const [izabraneZvezdice, setIzabraneZvezdice] = useState(0);
   const [tekstOcene, setTekstOcene] = useState("");
@@ -440,6 +448,13 @@ export default function Home() {
   const hendlajPracenjeKoda = (e) => {
     e.preventDefault();
     if (!unetiKod || osvezavanjeUToku) return;
+    const sada = Date.now();
+    if (sada - poslednjaPretragaRef.current < KOD_PRETRAGA_COOLDOWN_MS) {
+      setPretragaPrebrza(true);
+      return;
+    }
+    poslednjaPretragaRef.current = sada;
+    setPretragaPrebrza(false);
     const kod = unetiKod;
     setUnetiKod("");
     setStatusPorudzbine(null);
@@ -598,7 +613,7 @@ export default function Home() {
               </div>
             )}
 
-            <p className="text-xs font-bold text-emerald-600 mb-3">
+            <p className="text-xs font-bold text-emerald-700 mb-3">
               {t.freeDeliveryFrom}
             </p>
 
@@ -608,7 +623,7 @@ export default function Home() {
                   j.kategorija === selektovanaKategorija &&
                   (selektovanaKategorija !== "restoran" ||
                     j.podkategorija === selektovanaPodkategorija),
-              ).map((jelo) => (
+              ).map((jelo, indeks) => (
                 <div
                   key={jelo.id}
                   onClick={() => otvoriDodatke(jelo)}
@@ -633,6 +648,7 @@ export default function Home() {
                       fill
                       sizes="80px"
                       className="object-cover"
+                      priority={indeks === 0}
                     />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -642,7 +658,7 @@ export default function Home() {
                     <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">
                       {jelo.opis[jezik]}
                     </p>
-                    <p className="font-extrabold text-brand-gold mt-2">
+                    <p className="font-extrabold text-brand-gold-text mt-2">
                       {jelo.cena} RSD
                     </p>
                   </div>
@@ -732,14 +748,16 @@ export default function Home() {
                     </span>
                   </div>
                   {trosakDostave > 0 && (
-                    <p className="text-[11px] text-emerald-600 font-bold">
+                    <p className="text-[11px] text-emerald-700 font-bold">
                       {t.freeDeliveryFrom}
                     </p>
                   )}
                   <hr className="border-slate-100 my-1" />
                   <div className="flex justify-between text-slate-950 font-black text-sm">
                     <span>{t.total}:</span>
-                    <span className="text-brand-gold">{ukupnaCena} RSD</span>
+                    <span className="text-brand-gold-text">
+                      {ukupnaCena} RSD
+                    </span>
                   </div>
                 </div>
 
@@ -830,6 +848,12 @@ export default function Home() {
               </button>
             </form>
 
+            {pretragaPrebrza && (
+              <p className="text-xs text-red-700 -mt-4 mb-4">
+                {t.searchTooFast}
+              </p>
+            )}
+
             {!aktivniIdPorudzbine ? (
               <p className="text-slate-500 text-sm py-8">{t.noOrders}</p>
             ) : porudzbinaNijeNadjena ? (
@@ -863,7 +887,7 @@ export default function Home() {
                           : statusPorudzbine.status === "u_pripremi"
                             ? "text-blue-500"
                             : statusPorudzbine.status === "spremno_za_dostavu"
-                              ? "text-emerald-600"
+                              ? "text-emerald-700"
                               : "text-indigo-600"
                     }`}
                   >
@@ -1033,7 +1057,7 @@ export default function Home() {
                       key={broj}
                       onClick={() => setIzabraneZvezdice(broj)}
                       aria-label={`${broj} zvezdica`}
-                      className={`text-4xl transition-all ${broj <= izabraneZvezdice ? "text-brand-gold" : "text-slate-300"}`}
+                      className={`text-4xl transition-all ${broj <= izabraneZvezdice ? "text-brand-gold-text" : "text-slate-300"}`}
                     >
                       {broj <= izabraneZvezdice ? "★" : "☆"}
                     </button>
@@ -1154,7 +1178,7 @@ export default function Home() {
           </div>
           <button
             onClick={otvoriModalOcene}
-            className="flex items-center gap-1.5 text-xs font-bold text-brand-gold hover:text-brand-gold-hover transition-all"
+            className="flex items-center gap-1.5 text-xs font-bold text-brand-gold-text hover:text-brand-gold-hover transition-all"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 2l2.9 6.5L22 9.3l-5 4.9L18.2 22 12 18.3 5.8 22 7 14.2l-5-4.9 7.1-.8z" />

@@ -1,10 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import {
-  signInWithEmailAndPassword,
-  onAuthStateChanged,
-  signOut,
-} from "firebase/auth";
-import {
   collection,
   doc,
   getDocs,
@@ -16,7 +11,7 @@ import {
   runTransaction,
   serverTimestamp,
 } from "firebase/firestore";
-import { auth, db } from "../lib/firebase";
+import { getFirebaseAuth, db } from "../lib/firebase";
 import { REDOSLED_STATUSA } from "../lib/constants";
 import { danasnjiDatum } from "../lib/pomocne";
 import { NAZIV_JELA_SR } from "../lib/jelovnik";
@@ -120,28 +115,42 @@ export function useInternoOsoblje(dozvoljeneUloge, porukaZabranjenogPristupa) {
     };
   }, []);
 
-  // ---- Firebase Auth state + custom claim uloga ----
+  // ---- Firebase Auth state + custom claim uloga - lenjo (dynamic import),
+  // Auth SDK se učitava tek kad se OVA stranica (kuhinja/admin) montira, ne
+  // globalno za sve stranice (vidi komentar u lib/firebase.js). ----
   useEffect(() => {
-    const odjava = onAuthStateChanged(auth, async (korisnik) => {
-      if (korisnik) {
-        const tokenRezultat = await korisnik.getIdTokenResult();
-        const dobijenaUloga = tokenRezultat.claims.role || null;
-        if (dobijenaUloga && !dozvoljeneUloge.includes(dobijenaUloga)) {
-          setGreskaPristupa(
-            porukaZabranjenogPristupa ||
-              "Ovaj nalog nema pristup ovoj stranici.",
-          );
-          await signOut(auth);
-          setUloga(null);
+    let odjava = () => {};
+    let otkazano = false;
+    (async () => {
+      const [{ onAuthStateChanged, signOut }, auth] = await Promise.all([
+        import("firebase/auth"),
+        getFirebaseAuth(),
+      ]);
+      if (otkazano) return;
+      odjava = onAuthStateChanged(auth, async (korisnik) => {
+        if (korisnik) {
+          const tokenRezultat = await korisnik.getIdTokenResult();
+          const dobijenaUloga = tokenRezultat.claims.role || null;
+          if (dobijenaUloga && !dozvoljeneUloge.includes(dobijenaUloga)) {
+            setGreskaPristupa(
+              porukaZabranjenogPristupa ||
+                "Ovaj nalog nema pristup ovoj stranici.",
+            );
+            await signOut(auth);
+            setUloga(null);
+          } else {
+            setUloga(dobijenaUloga);
+          }
         } else {
-          setUloga(dobijenaUloga);
+          setUloga(null);
         }
-      } else {
-        setUloga(null);
-      }
-      setUcitavanjeUloge(false);
-    });
-    return () => odjava();
+        setUcitavanjeUloge(false);
+      });
+    })();
+    return () => {
+      otkazano = true;
+      odjava();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -196,6 +205,10 @@ export function useInternoOsoblje(dozvoljeneUloge, porukaZabranjenogPristupa) {
     otkljucajZvuk(); // klik na dugme = prava korisnička interakcija, otključava zvuk za ostatak sesije
     setPrijavaUToku(true);
     try {
+      const [{ signInWithEmailAndPassword }, auth] = await Promise.all([
+        import("firebase/auth"),
+        getFirebaseAuth(),
+      ]);
       await signInWithEmailAndPassword(auth, email.trim(), pin);
     } catch (greska) {
       setGreskaPristupa("Netačan email ili PIN kod!");
@@ -205,6 +218,10 @@ export function useInternoOsoblje(dozvoljeneUloge, porukaZabranjenogPristupa) {
   };
 
   const hendlajOdjavu = async () => {
+    const [{ signOut }, auth] = await Promise.all([
+      import("firebase/auth"),
+      getFirebaseAuth(),
+    ]);
     await signOut(auth);
   };
 
