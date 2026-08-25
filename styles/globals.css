@@ -30,6 +30,13 @@
   --color-spremno: #4fa87d; /* zelena - spremno za kurira */
   --color-kasni: #e05c4b; /* crvena - probijen rok */
 
+  /* ---- Boje oznaka jela (ljuto / alergeni / biljno).
+     Namerno prigušene: na kartici jela cena mora da ostane najjači
+     element, oznake su informacija a ne ukras. ---- */
+  --color-ljuto: #e0705c;
+  --color-alergen: #e0a93f;
+  --color-biljno: #5fb088;
+
   /* ---- Fontovi (self-hostovani preko next/font, vidi pages/index.js) ----
      Display = nazivi jela i naslovi. Body = sav ostali tekst.
      Num = SVE cifre (cene, gramaža, kod porudžbine) - tabelarne cifre se
