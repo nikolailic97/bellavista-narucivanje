@@ -2,51 +2,89 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // VAŽNO: nije dovoljno da je korisnik samo ULOGOVAN - mora da ima i
+    // "role" custom claim postavljen preko scripts/postavi-uloge.js.
+    // Ranije je ovde stajalo samo `request.auth != null`, što je značilo da
+    // BILO KOJI Firebase nalog na projektu (uključujući nalog koji napadač
+    // sam sebi napravi preko javnog API ključa, ako je registracija
+    // uključena) može da čita imena/telefone/adrese svih kupaca.
     function jeOsoblje() {
-      return request.auth != null;
+      return request.auth != null
+             && request.auth.token.role in ['kuhinja', 'admin'];
     }
     function jeUloga(uloga) {
       return request.auth != null && request.auth.token.role == uloga;
     }
 
-    // Pun dokument porudžbine — ime/telefon/adresa/cena, čita i piše samo osoblje.
-    // Gost sme samo da KREIRA (guest checkout), uz proveru da status i obavezna
-    // polja postoje (validacija cene nije moguća bez Cloud Function-a — svesna
-    // odluka u skladu sa zero-cost arhitekturom).
+    // Zdravorazumske granice za podatke koje upisuje NEULOGOVAN gost.
+    // Ne mogu da spreče lažiranje cene (za to treba Cloud Function), ali
+    // sprečavaju spam, ogromne dokumente i besmislene vrednosti - a to je
+    // ono što realno troši kvotu i pravi štetu.
+    function validanTekst(polje, maks) {
+      return polje is string && polje.size() <= maks;
+    }
+
+    // Pun dokument porudžbine - ime/telefon/adresa/cena, čita i piše samo osoblje.
+    // Gost sme samo da KREIRA (guest checkout).
     match /porudzbine/{id} {
       allow create: if request.resource.data.status == 'novo'
+                    // hasOnly (ne samo hasAll!) - bez ovoga gost sme da doda
+                    // proizvoljna dodatna polja, npr. blob od 1MB, i tako
+                    // troši tvoju Firestore kvotu.
+                    && request.resource.data.keys().hasOnly([
+                         'broj', 'ime', 'telefon', 'adresa', 'napomena',
+                         'stavke', 'cena_ukupno', 'nacin_placanja', 'status',
+                         'datum', 'vreme_kreiranja', 'trajanje_procena_min'
+                       ])
                     && request.resource.data.keys().hasAll([
                          'broj', 'ime', 'telefon', 'adresa', 'stavke',
                          'cena_ukupno', 'nacin_placanja', 'status',
                          'datum', 'vreme_kreiranja', 'trajanje_procena_min'
-                       ]);
+                       ])
+                    && validanTekst(request.resource.data.broj, 10)
+                    && validanTekst(request.resource.data.ime, 100)
+                    && request.resource.data.ime.size() > 0
+                    && validanTekst(request.resource.data.telefon, 30)
+                    && validanTekst(request.resource.data.adresa, 200)
+                    && validanTekst(request.resource.data.napomena, 500)
+                    && validanTekst(request.resource.data.datum, 10)
+                    && request.resource.data.nacin_placanja == 'gotovina'
+                    && request.resource.data.stavke is list
+                    && request.resource.data.stavke.size() > 0
+                    && request.resource.data.stavke.size() <= 50
+                    && request.resource.data.cena_ukupno is number
+                    && request.resource.data.cena_ukupno > 0
+                    && request.resource.data.cena_ukupno <= 100000
+                    && request.resource.data.trajanje_procena_min is number
+                    && request.resource.data.vreme_kreiranja is timestamp;
       allow read, update, delete: if jeOsoblje();
     }
 
-    // Javni dokument — SAMO status + vremenski podaci, nikad lični podaci/cena.
+    // Javni dokument - SAMO status + vremenski podaci, nikad lični podaci/cena.
     // Ovo je jedino što kupac ikad čita (tracking ekran), doc ID = broj porudžbine.
     match /status_porudzbine/{broj} {
       allow create: if request.resource.data.status == 'novo'
+                    && request.resource.data.keys().hasOnly([
+                         'status', 'datum', 'vreme_kreiranja', 'trajanje_procena_min'
+                       ])
                     && request.resource.data.keys().hasAll([
                          'status', 'datum', 'vreme_kreiranja', 'trajanje_procena_min'
-                       ]);
+                       ])
+                    && validanTekst(request.resource.data.datum, 10)
+                    && request.resource.data.trajanje_procena_min is number
+                    && request.resource.data.vreme_kreiranja is timestamp;
       allow read: if true;
       allow update, delete: if jeOsoblje();
     }
 
-    // Dnevni izveštaji — poverljivi podaci o prihodu, čita SAMO admin (Owner
-    // Analytics). Piše osoblje (kuhinja ili admin preko "Zatvori poslovni dan").
+    // Dnevni izveštaji - poverljivi podaci o prihodu. Čita i piše osoblje;
+    // kuhinja mora da čita jer "Zatvori poslovni dan" koristi transakciju
+    // (pročitaj-spoji-upiši) da ispravno sabira po stavkama.
     match /izvestaji/{datum} {
-      // Bilo koje osoblje sme da čita - kuhinja poziva "Zatvori poslovni dan"
-      // koje sad koristi transakciju (pročitaj-spoji-upiši) da ispravno
-      // sabira po stavkama bez rizika da izgubi postojeće podatke.
-      allow read: if jeOsoblje();
-      allow write: if jeOsoblje();
+      allow read, write: if jeOsoblje();
     }
 
-    // Lagani javni marker "da li je dan zatvoren" — bez prihoda/porudžbina,
-    // sme da ga čita i kuhinja (potrebno za idempotentnost dugmeta "Zatvori
-    // poslovni dan" bez pristupa poverljivim izvestaji podacima).
+    // Lagani marker "da li je dan zatvoren" - bez prihoda/porudžbina.
     match /izvestaji_status/{datum} {
       allow read, write: if jeOsoblje();
     }
@@ -54,17 +92,29 @@ service cloud.firestore {
     // Recenzije kupaca - gost sme SAMO da kreira (1-5 zvezdica + opcioni
     // tekst), čita/briše samo admin (interna reputacija/žalbe, ne javni podaci).
     match /recenzije/{id} {
-      allow create: if request.resource.data.keys().hasAll(['zvezdice', 'datum', 'vreme_kreiranja'])
+      allow create: if request.resource.data.keys().hasOnly([
+                         'zvezdice', 'tekst', 'datum', 'vreme_kreiranja'
+                       ])
+                    && request.resource.data.keys().hasAll([
+                         'zvezdice', 'datum', 'vreme_kreiranja'
+                       ])
                     && request.resource.data.zvezdice is int
                     && request.resource.data.zvezdice >= 1
-                    && request.resource.data.zvezdice <= 5;
+                    && request.resource.data.zvezdice <= 5
+                    // Bez ovoga neko može da upiše tekst od više stotina KB,
+                    // neograničen broj puta - najjeftiniji način da ti neko
+                    // namerno napuni bazu.
+                    && validanTekst(request.resource.data.tekst, 500)
+                    && validanTekst(request.resource.data.datum, 10)
+                    && request.resource.data.vreme_kreiranja is timestamp;
       allow read, update, delete: if jeUloga('admin');
     }
   }
 }
 
-// NAPOMENA: validacija cene pri kreiranju porudžbine nije moguća bez Cloud
-// Function-a (svesna odluka, u skladu sa zero-cost arhitekturom). Rules
-// proveravaju samo da status pri kreiranju bude "novo" i da obavezna polja
-// postoje — dovoljno da spreči slučajno/nepotpuno upisane dokumente, ne i
-// zlonamerno menjanje cena (isti nivo poverenja kao i ostatak MVP-a).
+// NAPOMENA: tačna validacija cene (da cena_ukupno stvarno odgovara zbiru
+// stavki po ceniku) nije moguća bez Cloud Function-a - svesna odluka u
+// skladu sa zero-cost arhitekturom. Pravila iznad proveravaju tip, opseg i
+// veličinu svakog polja, što sprečava spam i zloupotrebu kvote, ali ne i
+// nekoga ko namerno pošalje porudžbinu sa manjom cenom. Pošto se plaća
+// pouzećem, osoblje u kuhinji ionako vidi stavke i cenu pre isporuke.
