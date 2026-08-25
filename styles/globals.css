@@ -1,7 +1,9 @@
 @import "tailwindcss";
 
-/* Bellavista brend boje - ista tamna baza (#1A2328) kao na
-   restoran-bellavista sajtu, + zlatni akcent za "premium" ton. */
+/* Bellavista brend boje.
+   VAŽNO: brand-dark / brand-gold / brand-cream se i dalje koriste na
+   /kuhinja i /admin stranicama - ne dirati ih dok se i te stranice ne
+   redizajniraju, inače će interni panel da se raspadne. */
 @theme {
   --color-brand-dark: #1a2328;
   --color-brand-dark-hover: #263239;
@@ -9,4 +11,36 @@
   --color-brand-gold-hover: #b3901f;
   --color-brand-gold-text: #8d721b;
   --color-brand-cream: #faf6ed;
+
+  /* ---- Tamna paleta, kupčeva strana (pages/index.js) ---- */
+  --color-noc: #14191c; /* pozadina stranice */
+  --color-ugalj: #1e262b; /* kartice, polja */
+  --color-ugalj-vis: #28333a; /* ivice, razdvajanje */
+  --color-zlato: #c9a227; /* isti akcenat kao brand-gold */
+  --color-zlato-svetlo: #e3c158; /* hover, sekundarni tekst na zlatnom */
+  --color-krem: #ede7da; /* glavni tekst */
+  --color-krem-tih: #9aa3a8; /* sekundarni tekst */
+  --color-zelena: #4fa87d; /* završeni korak u praćenju */
+
+  /* ---- Fontovi (self-hostovani preko next/font, vidi pages/index.js) ----
+     Display = nazivi jela i naslovi. Body = sav ostali tekst.
+     Num = SVE cifre (cene, gramaža, kod porudžbine) - tabelarne cifre se
+     poravnavaju vertikalno kroz listu, pa se cene lakše porede. */
+  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-body: var(--font-inter), system-ui, sans-serif;
+  --font-num: var(--font-jetbrains), ui-monospace, monospace;
+}
+
+/* Tamna pozadina i na overscroll-u (iOS bounce), da ne bljesne belo */
+html {
+  background-color: #14191c;
+}
+
+/* Skrivanje scrollbar-a na horizontalnim trakama kategorija */
+.bez-scrollbara {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.bez-scrollbara::-webkit-scrollbar {
+  display: none;
 }
