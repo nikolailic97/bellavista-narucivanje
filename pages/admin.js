@@ -9,6 +9,7 @@ import {
   where,
   orderBy,
   limit,
+  startAfter,
   documentId,
 } from "firebase/firestore";
 import {
@@ -67,6 +68,10 @@ export default function AdminStranica() {
   const [recenzijeUcitavanje, setRecenzijeUcitavanje] = useState(false);
   const [filterZvezdice, setFilterZvezdice] = useState(0); // 0 = sve
   const [otvorenaRecenzija, setOtvorenaRecenzija] = useState(null);
+  // Paginacija - ranije se učitavalo do 500 recenzija na SVAKO otvaranje
+  // admin panela (do 500 Firestore čitanja svaki put, bez potrebe).
+  const [poslednjiRecenzijaDoc, setPoslednjiRecenzijaDoc] = useState(null);
+  const [imaJosRecenzija, setImaJosRecenzija] = useState(false);
 
   // ---- Admin analitika: čita samo izveštaje, ručno + na promenu perioda ----
   // Agregira niz porudzbine dokumenata u {total_orders, total_revenue, top_items}
@@ -230,21 +235,30 @@ export default function AdminStranica() {
     }
   };
 
-  // ---- Recenzije - sve učitane odjednom (mala/srednja količina za lokalni
-  // restoran), sortirane najnovije prvo, filter po zvezdicama je client-side ----
-  const ucitajRecenzije = async () => {
+  // ---- Recenzije - učitavaju se u stranicama po 50, najnovije prvo.
+  // Filter po zvezdicama je client-side (radi nad već učitanim recenzijama). ----
+  const RECENZIJA_PO_STRANI = 50;
+
+  const ucitajRecenzije = async (nastavi = false) => {
     setRecenzijeUcitavanje(true);
     try {
-      const q = query(
+      const uslovi = [
         collection(db, "recenzije"),
         orderBy("vreme_kreiranja", "desc"),
-        limit(500),
-      );
-      const snap = await getDocs(q);
-      setRecenzije(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      ];
+      if (nastavi && poslednjiRecenzijaDoc) {
+        uslovi.push(startAfter(poslednjiRecenzijaDoc));
+      }
+      uslovi.push(limit(RECENZIJA_PO_STRANI));
+      const snap = await getDocs(query(...uslovi));
+      const nove = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setRecenzije((prethodne) => (nastavi ? [...prethodne, ...nove] : nove));
+      setPoslednjiRecenzijaDoc(snap.docs[snap.docs.length - 1] || null);
+      // Ako je stiglo tačno koliko smo tražili, verovatno ima još.
+      setImaJosRecenzija(snap.docs.length === RECENZIJA_PO_STRANI);
     } catch (greska) {
       console.error("Greška pri učitavanju recenzija:", greska);
-      setRecenzije([]);
+      if (!nastavi) setRecenzije([]);
     } finally {
       setRecenzijeUcitavanje(false);
     }
@@ -464,7 +478,7 @@ export default function AdminStranica() {
 
             {pregled === "recenzije" && (
               <div className="max-w-2xl space-y-4">
-                {recenzijeUcitavanje ? (
+                {recenzijeUcitavanje && recenzije.length === 0 ? (
                   <p className="text-center text-slate-500 text-sm py-6">
                     Učitavanje...
                   </p>
@@ -478,7 +492,11 @@ export default function AdminStranica() {
                         <span className="text-amber-400 text-sm">★★★★★</span>
                         <span className="text-[10px] text-slate-500 block mt-0.5">
                           {brojRecenzija}{" "}
-                          {brojRecenzija === 1 ? "ocena" : "ocena ukupno"}
+                          {imaJosRecenzija
+                            ? "poslednjih ocena"
+                            : brojRecenzija === 1
+                              ? "ocena"
+                              : "ocena ukupno"}
                         </span>
                       </div>
                       <div className="flex-1 space-y-1">
@@ -558,6 +576,16 @@ export default function AdminStranica() {
                           </button>
                         ))}
                       </div>
+                    )}
+
+                    {imaJosRecenzija && (
+                      <button
+                        onClick={() => ucitajRecenzije(true)}
+                        disabled={recenzijeUcitavanje}
+                        className="w-full bg-white border border-slate-200 text-slate-600 font-bold text-sm py-2.5 rounded-xl hover:border-slate-300 transition-all disabled:opacity-50"
+                      >
+                        {recenzijeUcitavanje ? "Učitavanje..." : "Učitaj još"}
+                      </button>
                     )}
                   </>
                 )}

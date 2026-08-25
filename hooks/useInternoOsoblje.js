@@ -131,7 +131,18 @@ export function useInternoOsoblje(dozvoljeneUloge, porukaZabranjenogPristupa) {
         if (korisnik) {
           const tokenRezultat = await korisnik.getIdTokenResult();
           const dobijenaUloga = tokenRezultat.claims.role || null;
-          if (dobijenaUloga && !dozvoljeneUloge.includes(dobijenaUloga)) {
+          if (!dobijenaUloga) {
+            // Nalog postoji u Firebase Auth, ali mu nikad nije dodeljena
+            // uloga (scripts/postavi-uloge.js nije pokrenut za njega).
+            // RANIJE se ovaj slučaj tiho preskakao - korisnik bi se uspešno
+            // ulogovao, pa bi ga odmah vratilo na login ekran BEZ ikakve
+            // poruke, što izgleda kao da dugme "Prijavi se" ne radi.
+            setGreskaPristupa(
+              "Ovom nalogu nije dodeljena uloga. Kontaktiraj administratora.",
+            );
+            await signOut(auth);
+            setUloga(null);
+          } else if (!dozvoljeneUloge.includes(dobijenaUloga)) {
             setGreskaPristupa(
               porukaZabranjenogPristupa ||
                 "Ovaj nalog nema pristup ovoj stranici.",
