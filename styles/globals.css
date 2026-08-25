@@ -22,6 +22,14 @@
   --color-krem-tih: #9aa3a8; /* sekundarni tekst */
   --color-zelena: #4fa87d; /* završeni korak u praćenju */
 
+  /* ---- Statusne boje kuhinjske table (pages/kuhinja.js).
+     Biraju se tako da se razlikuju sa 2 metra, jer tablet stoji na pultu
+     i gleda se u prolazu, ne izbliza. ---- */
+  --color-novo: #e0912f; /* narandžasta - čeka da se počne */
+  --color-pripr: #5b93c4; /* plava - u pripremi */
+  --color-spremno: #4fa87d; /* zelena - spremno za kurira */
+  --color-kasni: #e05c4b; /* crvena - probijen rok */
+
   /* ---- Fontovi (self-hostovani preko next/font, vidi pages/index.js) ----
      Display = nazivi jela i naslovi. Body = sav ostali tekst.
      Num = SVE cifre (cene, gramaža, kod porudžbine) - tabelarne cifre se

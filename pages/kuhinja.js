@@ -1,4 +1,5 @@
 import Head from "next/head";
+import { klaseFontova } from "../lib/fontovi";
 import { useInternoOsoblje } from "../hooks/useInternoOsoblje";
 import KuhinjskaTabla from "../components/KuhinjskaTabla";
 import PinPrijava from "../components/PinPrijava";
@@ -31,17 +32,33 @@ export default function KuhinjaStranica() {
     if (uspesno) hendlajOdjavu();
   };
 
+  // Sat u zaglavlju - koristi sadaTick koji hook ionako već otkucava svake
+  // sekunde radi računanja kašnjenja, pa nema dodatnog tajmera.
+  const sada = new Date(sadaTick || Date.now());
+  const datumTekst = sada.toLocaleDateString("sr-RS", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+  const satTekst = sada.toLocaleTimeString("sr-RS", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
   return (
-    <div className="min-h-screen bg-slate-50 font-sans antialiased text-slate-800">
+    <div
+      className={`${klaseFontova} min-h-screen bg-noc text-krem font-body antialiased`}
+    >
       <Head>
         <title>Kuhinja — Interni panel</title>
         <meta name="robots" content="noindex, nofollow" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" content="#14191C" />
       </Head>
 
-      <div className="max-w-5xl mx-auto p-4 sm:p-6">
+      <div className="max-w-[1400px] mx-auto p-4 sm:p-5">
         {ucitavanjeUloge ? (
-          <p className="text-center text-slate-500 text-sm py-12">
+          <p className="text-center text-krem-tih text-sm py-12">
             Učitavanje...
           </p>
         ) : !imaPristup ? (
@@ -56,18 +73,22 @@ export default function KuhinjaStranica() {
             onSubmit={hendlajLogin}
           />
         ) : (
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h1 className="text-xl font-black text-brand-dark">
-                Kuhinjska tabla
-              </h1>
+          <>
+            <div className="flex justify-between items-center flex-wrap gap-3 mb-5">
+              <div>
+                <h1 className="font-display text-2xl text-krem">Kuhinja</h1>
+                <p className="font-num text-[13px] font-bold text-krem-tih mt-0.5 first-letter:uppercase">
+                  {datumTekst} · {satTekst}
+                </p>
+              </div>
               <button
                 onClick={hendlajOdjavu}
-                className="text-xs text-red-500 font-bold hover:text-red-600 transition-all"
+                className="bg-ugalj border border-ugalj-vis text-krem font-bold text-xs px-4 py-2.5 rounded-[10px] hover:border-krem-tih transition-colors"
               >
                 Odjavi se
               </button>
             </div>
+
             <KuhinjskaTabla
               porudzbine={porudzbine}
               sadaTick={sadaTick}
@@ -77,7 +98,7 @@ export default function KuhinjaStranica() {
               zatvaranjeUToku={zatvaranjeUToku}
               mozeMenjatiVreme
             />
-          </div>
+          </>
         )}
       </div>
     </div>

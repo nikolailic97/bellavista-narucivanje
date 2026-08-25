@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import Head from "next/head";
 import Image from "next/image";
-import { Fraunces, Inter, JetBrains_Mono } from "next/font/google";
+import { klaseFontova } from "../lib/fontovi";
 import {
   collection,
   doc,
   addDoc,
-  getDoc,
+  onSnapshot,
   runTransaction,
   serverTimestamp,
 } from "firebase/firestore";
@@ -24,29 +24,6 @@ import {
   TAGOVI_INFO,
   PODKATEGORIJE_RESTORAN,
 } from "../lib/jelovnik";
-
-// ---- Fontovi preko next/font: skidaju se u BUILD-u i serviraju sa našeg
-// domena, pa nema poziva ka fonts.googleapis.com u runtime-u (bez toga bi
-// font bio render-blocking resurs i obarao Lighthouse). "latin-ext" subset
-// je OBAVEZAN - bez njega nema č, ć, š, ž, đ. ----
-const fraunces = Fraunces({
-  subsets: ["latin-ext"],
-  weight: ["600"],
-  display: "swap",
-  variable: "--font-fraunces",
-});
-const inter = Inter({
-  subsets: ["latin-ext"],
-  weight: ["400", "500", "600", "700"],
-  display: "swap",
-  variable: "--font-inter",
-});
-const jetbrains = JetBrains_Mono({
-  subsets: ["latin-ext"],
-  weight: ["500", "700"],
-  display: "swap",
-  variable: "--font-jetbrains",
-});
 
 // ============ TODO: ZAMENI KAD DOBIJEMO FINALNI NAZIV/LOGO ============
 const NAZIV_RESTORANA = "Restoran"; // koristi se u title/meta/JSON-LD, logo slika ide preko /images/logo.png
@@ -71,6 +48,29 @@ const REDOSLED_KORAKA = [
   "spremno_za_dostavu",
   "zavrseno",
 ];
+
+// ---- Da li je porudžbina "istekla" za KUPCA (ne briše se iz baze - osoblje
+// je i dalje vidi do "Zatvori poslovni dan", samo je kupac više ne prati).
+// Dva slučaja:
+//   1) status "zavrseno" + prošlo 10 min od završetka
+//   2) status "spremno_za_dostavu" + prošlo 15 min - sigurnosna mreža za
+//      slučaj da osoblje zaboravi da klikne finalno "Označi završeno"
+// ----
+function jeIsteklaPorudzbina(podaci) {
+  const zavrsenoMs = vremeUMilisekundama(podaci.vreme_zavrseno);
+  const isteklaZavrsena =
+    podaci.status === "zavrseno" &&
+    zavrsenoMs &&
+    Date.now() - zavrsenoMs > MIN_VIDLJIVOSTI_POSLE_ZAVRSETKA * 60000;
+
+  const spremnoMs = vremeUMilisekundama(podaci.vreme_spremno_za_dostavu);
+  const isteklaSpremna =
+    podaci.status === "spremno_za_dostavu" &&
+    spremnoMs &&
+    Date.now() - spremnoMs > MIN_VIDLJIVOSTI_SPREMNO_ZA_DOSTAVU * 60000;
+
+  return Boolean(isteklaZavrsena || isteklaSpremna);
+}
 
 // ---- Prezentacione pomoćne funkcije ----
 // Gramaža je deo naziva u jelovniku ("Ćevapi 350g", "Sablja Bellavista 1.2kg")
@@ -432,13 +432,78 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [statusPorudzbine]);
 
-  // ---- Auto-učitaj status porudžbine kad korisnik otvori "Prati" sa sačuvanim brojem ----
+  // ---- PRAĆENJE PORUDŽBINE: onSnapshot listener umesto ručnog getDoc-a.
+  //
+  // Zašto je ovo JEFTINIJE, a ne skuplje:
+  // Ranije je svako otvaranje "Prati" ekrana (ili osvežavanje stranice) bilo
+  // 1 čitanje - nervozan kupac koji proveri 15 puta = 15 čitanja, iako se
+  // status u međuvremenu promenio svega 3 puta. Listener naplaćuje 1 čitanje
+  // pri kačenju + 1 po STVARNOJ promeni dokumenta. Porudžbina ima tačno 3
+  // promene statusa, znači ~4 čitanja ukupno, bez obzira koliko puta kupac
+  // gleda ekran. Uz to kupac vidi promenu odmah, bez osvežavanja.
+  //
+  // Dva uslova da ostane jeftino (oba ispod):
+  //   1) listener radi SAMO dok je "Prati" tab otvoren
+  //   2) odspaja se kad korisnik prebaci tab u browseru / zaključa telefon,
+  //      da otvoren tab preko noći ne drži konekciju bez potrebe
+  // ----
   useEffect(() => {
-    if (aktivniIdPorudzbine && !statusPorudzbine) {
-      osveziStatusPorudzbine(aktivniIdPorudzbine);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aktivniIdPorudzbine]);
+    if (!aktivniIdPorudzbine || aktivniTab !== "prati") return;
+
+    let odjavi = null;
+
+    const obradiSnimak = (snap) => {
+      setOsvezavanjeUToku(false);
+      if (!snap.exists()) {
+        setStatusPorudzbine(null);
+        setPorudzbinaNijeNadjena(true);
+        localStorage.removeItem("id_porudzbine");
+        return;
+      }
+      const podaci = snap.data();
+      if (jeIsteklaPorudzbina(podaci)) {
+        setStatusPorudzbine(null);
+        setPorudzbinaNijeNadjena(true);
+        localStorage.removeItem("id_porudzbine");
+      } else {
+        setStatusPorudzbine(podaci);
+        setPorudzbinaNijeNadjena(false);
+      }
+    };
+
+    const zakaci = () => {
+      if (odjavi) return;
+      setOsvezavanjeUToku(true);
+      odjavi = onSnapshot(
+        doc(db, "status_porudzbine", aktivniIdPorudzbine),
+        obradiSnimak,
+        (greska) => {
+          console.error("Greška pri praćenju statusa:", greska);
+          setOsvezavanjeUToku(false);
+        },
+      );
+    };
+
+    const otkaci = () => {
+      if (odjavi) {
+        odjavi();
+        odjavi = null;
+      }
+    };
+
+    const naPromenuVidljivosti = () => {
+      if (document.visibilityState === "hidden") otkaci();
+      else zakaci();
+    };
+
+    if (document.visibilityState === "visible") zakaci();
+    document.addEventListener("visibilitychange", naPromenuVidljivosti);
+
+    return () => {
+      document.removeEventListener("visibilitychange", naPromenuVidljivosti);
+      otkaci();
+    };
+  }, [aktivniIdPorudzbine, aktivniTab]);
 
   // ---- Zaključaj skrol dok je modal otvoren ----
   useEffect(() => {
@@ -557,9 +622,10 @@ export default function Home() {
 
       localStorage.setItem("id_porudzbine", finalniBroj);
       setAktivniIdPorudzbine(finalniBroj);
-      // Odmah prikaži "Primljena" status - znamo da je tako jer smo ga upravo
-      // kreirali, ne treba da kupac gleda prazno "—" dok traje fetch. Realni
-      // podaci (sa serverskim vremenom) stižu odmah posle preko fetch-a ispod.
+      // Odmah prikaži "Primljena" - znamo da je tako jer smo je upravo
+      // kreirali, pa kupac ne gleda prazan ekran dok se listener kači.
+      // Realni podaci (sa serverskim vremenom) stižu odmah zatim, prvim
+      // snimkom listener-a koji se kači čim se otvori "Prati" tab ispod.
       setStatusPorudzbine({
         status: "novo",
         vreme_kreiranja: { toMillis: () => Date.now() },
@@ -569,63 +635,11 @@ export default function Home() {
       setKorpa([]);
       setForma({ ime: "", telefon: "", adresa: "", napomena: "" });
       setAktivniTab("prati");
-      osveziStatusPorudzbine(finalniBroj);
     } catch (greska) {
       console.error("Greška prilikom slanja porudžbine:", greska);
       alert("Došlo je do greške prilikom slanja porudžbine. Pokušaj ponovo.");
     } finally {
       setSlanjeUToku(false);
-    }
-  };
-
-  // ---- Osvežavanje statusa - svaki klik na "Prati" uvek učitava sveže podatke
-  // (ručni klik je sam po sebi prirodno ograničenje, ne treba dodatni keš). ----
-  const osveziStatusPorudzbine = async (kod) => {
-    const ciljniKod = kod || aktivniIdPorudzbine;
-    if (!ciljniKod || osvezavanjeUToku) return;
-    setOsvezavanjeUToku(true);
-    try {
-      const snap = await getDoc(doc(db, "status_porudzbine", ciljniKod));
-      if (snap.exists()) {
-        const podaci = snap.data();
-        // Kad je porudžbina gotova (status "zavrseno"), kupac je i dalje vidi
-        // ~10 minuta, pa onda "nestaje" (ne postoji za njega) - staff je i
-        // dalje vidi/pretražuje normalno do "Zatvori poslovni dan".
-        const zavrsenoMs = vremeUMilisekundama(podaci.vreme_zavrseno);
-        const jeIsteklaZavrsena =
-          podaci.status === "zavrseno" &&
-          zavrsenoMs &&
-          Date.now() - zavrsenoMs > MIN_VIDLJIVOSTI_POSLE_ZAVRSETKA * 60000;
-        // Sigurnosna mreža: ako porudžbina uđe u "spremno_za_dostavu" (predata
-        // vozaču) i tu ostane (osoblje zaboravi da klikne finalno "završeno"),
-        // ionako nestaje kupcu ~15 minuta posle ulaska u taj status.
-        const spremnoMs = vremeUMilisekundama(podaci.vreme_spremno_za_dostavu);
-        const jeIsteklaSpremna =
-          podaci.status === "spremno_za_dostavu" &&
-          spremnoMs &&
-          Date.now() - spremnoMs > MIN_VIDLJIVOSTI_SPREMNO_ZA_DOSTAVU * 60000;
-        const jeIstekla = jeIsteklaZavrsena || jeIsteklaSpremna;
-        if (jeIstekla) {
-          setStatusPorudzbine(null);
-          setPorudzbinaNijeNadjena(true);
-          if (ciljniKod === aktivniIdPorudzbine) {
-            localStorage.removeItem("id_porudzbine");
-          }
-        } else {
-          setStatusPorudzbine(podaci);
-          setPorudzbinaNijeNadjena(false);
-        }
-      } else {
-        setStatusPorudzbine(null);
-        setPorudzbinaNijeNadjena(true);
-        if (ciljniKod === aktivniIdPorudzbine) {
-          localStorage.removeItem("id_porudzbine");
-        }
-      }
-    } catch (greska) {
-      console.error("Greška pri osvežavanju statusa:", greska);
-    } finally {
-      setOsvezavanjeUToku(false);
     }
   };
 
@@ -639,13 +653,14 @@ export default function Home() {
     }
     poslednjaPretragaRef.current = sada;
     setPretragaPrebrza(false);
-    const kod = unetiKod;
+    const kod = unetiKod.trim();
     setUnetiKod("");
     setStatusPorudzbine(null);
     setPorudzbinaNijeNadjena(false);
     localStorage.setItem("id_porudzbine", kod);
+    // Dovoljno je postaviti broj - useEffect iznad automatski kači listener
+    // na taj dokument (i skida prethodni, ako ga je bilo).
     setAktivniIdPorudzbine(kod);
-    osveziStatusPorudzbine(kod);
   };
 
   const otvoriModalOcene = () => {
@@ -718,7 +733,7 @@ export default function Home() {
 
   return (
     <div
-      className={`${fraunces.variable} ${inter.variable} ${jetbrains.variable} min-h-screen bg-noc text-krem font-body antialiased`}
+      className={`${klaseFontova} min-h-screen bg-noc text-krem font-body antialiased`}
     >
       <Head>
         <title>{NAZIV_RESTORANA} — Naruči online</title>

@@ -1,25 +1,55 @@
 import { useState } from "react";
-import { NAZIV_STATUSA, NAZIV_SLEDECE_AKCIJE } from "../lib/constants";
-import { jeliKasni } from "../lib/pomocne";
+import {
+  NAZIV_STATUSA,
+  NAZIV_SLEDECE_AKCIJE,
+  BUFFER_KASNJENJA_MIN,
+} from "../lib/constants";
+import { jeliKasni, vremeUMilisekundama } from "../lib/pomocne";
 import { NAZIV_JELA_SR, NAZIV_DODATKA_SR } from "../lib/jelovnik";
+
+// Kolone table. "zavrseno" se namerno NE prikazuje - te porudžbine su predate
+// kuriru i sklanjaju se sa table da ne prave šum; ostaju u bazi do "Zatvori
+// poslovni dan" i vidljive su kroz admin pretragu po kodu.
+const KOLONE = [
+  { status: "novo", boja: "bg-novo", ivica: "border-l-novo" },
+  { status: "u_pripremi", boja: "bg-pripr", ivica: "border-l-pripr" },
+  {
+    status: "spremno_za_dostavu",
+    boja: "bg-spremno",
+    ivica: "border-l-spremno",
+  },
+];
+
+// Koliko minuta porudžbina kasni u odnosu na procenu. Vraća 0 ako ne kasni
+// ili ako vreme nije uneto (kuhinja ga unosi ručno).
+function minutaKasnjenja(p, sadaMs) {
+  const kreiranoMs = vremeUMilisekundama(p.vreme_kreiranja);
+  if (!kreiranoMs || !p.trajanje_procena_min) return 0;
+  const pragMs =
+    kreiranoMs + (p.trajanje_procena_min + BUFFER_KASNJENJA_MIN) * 60000;
+  return Math.max(0, Math.floor((sadaMs - pragMs) / 60000));
+}
+
+function satUnosa(p) {
+  const ms = vremeUMilisekundama(p.vreme_kreiranja);
+  if (!ms) return "";
+  return new Date(ms).toLocaleTimeString("sr-RS", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 function PorudzbinaKartica({
   p,
   kasni,
+  kasniMin,
   naNapredujStatus,
   naAzurirajVreme,
   mozeMenjatiVreme,
+  ivica,
 }) {
   const [vreme, setVreme] = useState(String(p.trajanje_procena_min || ""));
   const [cuvanjeUToku, setCuvanjeUToku] = useState(false);
-
-  const bojaTema = kasni
-    ? { okvir: "border-red-500 border-dashed", banner: "bg-red-500" }
-    : p.status === "novo"
-      ? { okvir: "border-orange-400", banner: "bg-orange-400" }
-      : p.status === "u_pripremi"
-        ? { okvir: "border-blue-400", banner: "bg-blue-400" }
-        : { okvir: "border-emerald-400", banner: "bg-emerald-400" };
 
   const sacuvajVreme = async () => {
     if (cuvanjeUToku) return;
@@ -29,103 +59,131 @@ function PorudzbinaKartica({
   };
 
   return (
-    <div
-      className={`rounded-xl overflow-hidden shadow-sm border-2 ${bojaTema.okvir}`}
+    <article
+      className={`bg-ugalj border border-ugalj-vis rounded-2xl p-3.5 mb-3 border-l-4 ${
+        kasni ? "border-l-kasni border-kasni/40 bg-kasni/[0.07]" : ivica
+      }`}
     >
-      <div
-        className={`${bojaTema.banner} text-white text-center text-sm uppercase font-bold py-2 tracking-wide`}
-      >
-        {kasni ? "Kasni" : NAZIV_STATUSA[p.status]}
-      </div>
-      <div className="bg-white p-4">
-        <span className="font-black text-2xl text-slate-900 block mb-2">
-          #{p.broj}
+      <div className="flex justify-between items-baseline mb-3">
+        <span className="font-num text-[26px] font-extrabold tracking-[-.02em] text-krem">
+          {p.broj}
+          {kasni && (
+            <span className="inline-block align-middle font-num text-[9px] font-bold tracking-[.1em] bg-kasni text-white px-2 py-[3px] rounded-[5px] ml-2">
+              {kasniMin > 0 ? `KASNI ${kasniMin} MIN` : "KASNI"}
+            </span>
+          )}
         </span>
-        {/* Uvek srpski naziv (preko id_jela/id dodatka), bez obzira na jezik
-            na kom je kupac naručio - kupac vidi svoj jezik, kuhinja uvek srpski */}
-        <ul className="text-lg text-slate-800 space-y-1.5 mb-3 font-semibold">
-          {(p.stavke || []).map((stavka, i) => (
-            <li key={i}>
-              {stavka.kolicina}x {NAZIV_JELA_SR[stavka.id_jela] || stavka.naziv}
+        <span className="font-num text-[11px] font-medium text-krem-tih">
+          {satUnosa(p)}
+        </span>
+      </div>
+
+      {/* JELA - najveći element na kartici. Kuvar treba da vidi šta da peče;
+          ime/telefon/adresa su sklopljeni ispod jer trebaju tek kuriru.
+          Uvek srpski naziv (preko id_jela / id dodatka), bez obzira na kom
+          jeziku je kupac naručio. */}
+      <ul className="mb-3 list-none">
+        {(p.stavke || []).map((stavka, i) => (
+          <li key={i} className="flex gap-2.5 py-[5px] leading-snug">
+            <span className="font-num text-[15px] font-bold text-zlato flex-none min-w-[26px]">
+              {stavka.kolicina}&times;
+            </span>
+            <div className="text-base font-semibold text-krem">
+              {NAZIV_JELA_SR[stavka.id_jela] || stavka.naziv}
               {stavka.dodaci && stavka.dodaci.length > 0 && (
-                <span className="text-slate-500 font-medium text-base">
-                  {" "}
-                  (+
+                <small className="block text-xs font-medium text-krem-tih mt-px">
+                  +{" "}
                   {stavka.dodaci
                     .map((d) => NAZIV_DODATKA_SR[d.id] || d.naziv)
                     .join(", ")}
-                  )
-                </span>
+                </small>
               )}
-            </li>
-          ))}
-        </ul>
-        <div className="text-base text-slate-700 bg-slate-50 rounded-lg p-3 mb-3 space-y-1">
-          <p>
-            <span className="text-slate-500">Ime: </span>
-            <span className="font-bold text-slate-900">{p.ime}</span>
-          </p>
-          <p>
-            <span className="text-slate-500">Telefon: </span>
-            <span className="font-bold text-slate-900">{p.telefon}</span>
-          </p>
-          <p>
-            <span className="text-slate-500">Adresa: </span>
-            <span className="font-bold text-slate-900">{p.adresa}</span>
-          </p>
-          {p.napomena && (
-            <p>
-              <span className="text-slate-500">Napomena: </span>
-              <span className="font-bold text-amber-700">{p.napomena}</span>
-            </p>
-          )}
+              {stavka.napomena && (
+                <small className="block text-xs font-medium text-[#F0B267] mt-px">
+                  {stavka.napomena}
+                </small>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      {p.napomena && (
+        <div className="bg-novo/10 border border-novo/30 rounded-[9px] px-3 py-2 text-[12.5px] leading-snug text-[#F0B267] mb-3">
+          <b className="font-bold">Napomena:</b> {p.napomena}
         </div>
+      )}
 
-        {/* Procenjeno vreme - kuhinja/admin mogu da ga menjaju (npr. gužva u
-            restoranu utiče na dostavu) */}
-        {mozeMenjatiVreme ? (
-          <div className="flex items-center gap-2 mb-3">
-            <input
-              type="number"
-              min="1"
-              value={vreme}
-              onChange={(e) => setVreme(e.target.value)}
-              className="w-16 border border-slate-200 rounded-lg p-1.5 text-center text-base font-bold"
-              aria-label={`Procenjeno vreme za porudžbinu ${p.broj} (minuti)`}
-            />
-            <span className="text-sm text-slate-500">min</span>
-            <button
-              onClick={sacuvajVreme}
-              disabled={cuvanjeUToku}
-              className="ml-auto text-sm font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 px-3 py-1.5 rounded-lg transition-all"
-            >
-              {cuvanjeUToku ? "..." : "Sačuvaj vreme"}
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-1.5 mb-3 text-base text-slate-600">
-            <span>Procenjeno vreme:</span>
-            <span className="font-bold text-slate-900">
-              {p.trajanje_procena_min ? `${p.trajanje_procena_min} min` : "—"}
-            </span>
-          </div>
-        )}
-
-        {NAZIV_SLEDECE_AKCIJE[p.status] && (
-          <button
-            onClick={() => naNapredujStatus(p)}
-            className={`w-full text-white font-bold text-base py-3 rounded-lg transition-all ${
-              kasni
-                ? "bg-red-600 hover:bg-red-700"
-                : "bg-slate-900 hover:bg-slate-800"
-            }`}
-            aria-label={`Promeni status porudžbine ${p.broj}`}
+      {/* Podaci kupca - sklopljeno. Kuvaru ne trebaju, kuriru trebaju. */}
+      <details className="mb-3 group">
+        <summary className="list-none cursor-pointer font-num text-[11px] font-semibold tracking-[.1em] uppercase text-krem-tih py-2 border-t border-ugalj-vis flex justify-between items-center">
+          Podaci za dostavu
+          <span aria-hidden="true" className="group-open:hidden">
+            &#9662;
+          </span>
+          <span aria-hidden="true" className="hidden group-open:inline">
+            &#9652;
+          </span>
+        </summary>
+        <div className="text-[13px] leading-relaxed text-krem-tih pt-1 pb-1.5">
+          <span className="text-krem font-semibold">{p.ime}</span>
+          <br />
+          <a
+            href={`tel:${String(p.telefon || "").replace(/\s/g, "")}`}
+            className="text-krem font-semibold hover:text-zlato transition-colors"
           >
-            {NAZIV_SLEDECE_AKCIJE[p.status]}
+            {p.telefon}
+          </a>
+          <br />
+          <span className="text-krem font-semibold">{p.adresa}</span>
+        </div>
+      </details>
+
+      {/* Procenjeno vreme - kuhinja/admin ga unose ručno (gužva u restoranu
+          utiče na dostavu, automatski račun je bio netačan) */}
+      {mozeMenjatiVreme ? (
+        <div className="flex items-center gap-2 mb-3">
+          <input
+            type="number"
+            min="1"
+            value={vreme}
+            onChange={(e) => setVreme(e.target.value)}
+            placeholder="—"
+            className="w-[58px] bg-noc border border-ugalj-vis rounded-[9px] p-2 text-center font-num text-[15px] font-bold text-krem placeholder:text-krem-tih/60 focus:outline-none focus:border-zlato transition-colors"
+            aria-label={`Procenjeno vreme za porudžbinu ${p.broj} (minuti)`}
+          />
+          <span className="text-xs text-krem-tih">min</span>
+          <button
+            onClick={sacuvajVreme}
+            disabled={cuvanjeUToku}
+            className="ml-auto bg-ugalj-vis text-krem font-bold text-xs px-3.5 py-2 rounded-[9px] disabled:opacity-50 hover:brightness-125 transition-all"
+          >
+            {cuvanjeUToku ? "..." : "Sačuvaj"}
           </button>
-        )}
-      </div>
-    </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-1.5 mb-3 text-[13px] text-krem-tih">
+          <span>Procenjeno:</span>
+          <span className="font-num font-bold text-krem">
+            {p.trajanje_procena_min ? `${p.trajanje_procena_min} min` : "—"}
+          </span>
+        </div>
+      )}
+
+      {NAZIV_SLEDECE_AKCIJE[p.status] && (
+        <button
+          onClick={() => naNapredujStatus(p)}
+          className={`w-full font-bold text-[15px] py-3.5 rounded-[11px] transition-all ${
+            kasni
+              ? "bg-kasni text-white hover:brightness-110"
+              : "bg-zlato text-noc hover:bg-zlato-svetlo"
+          }`}
+          aria-label={`Promeni status porudžbine ${p.broj}`}
+        >
+          {NAZIV_SLEDECE_AKCIJE[p.status]}
+        </button>
+      )}
+    </article>
   );
 }
 
@@ -138,13 +196,72 @@ export default function KuhinjskaTabla({
   zatvaranjeUToku,
   mozeMenjatiVreme = false,
 }) {
+  const ukupnoAktivnih = porudzbine.filter((p) =>
+    KOLONE.some((k) => k.status === p.status),
+  ).length;
+
   return (
-    <div className="space-y-4">
-      <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm text-center">
+    <div>
+      {ukupnoAktivnih === 0 ? (
+        <p className="text-krem-tih text-sm text-center py-14">
+          Trenutno nema aktivnih porudžbina.
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5 items-start">
+          {KOLONE.map((kolona) => {
+            const uKoloni = porudzbine.filter(
+              (p) => p.status === kolona.status,
+            );
+            return (
+              <section
+                key={kolona.status}
+                className="bg-ugalj/50 border border-ugalj-vis rounded-2xl p-3 min-h-[180px]"
+              >
+                <header className="flex items-center gap-2.5 px-1 pb-3">
+                  <span
+                    aria-hidden="true"
+                    className={`w-2.5 h-2.5 rounded-full flex-none ${kolona.boja}`}
+                  />
+                  <h2 className="flex-1 font-num text-[11px] font-bold tracking-[.14em] uppercase text-krem">
+                    {NAZIV_STATUSA[kolona.status]}
+                  </h2>
+                  <span className="font-num text-xs font-bold bg-ugalj-vis text-krem min-w-6 text-center px-2 py-1 rounded-[7px]">
+                    {uKoloni.length}
+                  </span>
+                </header>
+
+                {uKoloni.length === 0 ? (
+                  <p className="text-center text-krem-tih/50 text-[12.5px] py-7">
+                    —
+                  </p>
+                ) : (
+                  uKoloni.map((p) => {
+                    const kasni = jeliKasni(p, sadaTick);
+                    return (
+                      <PorudzbinaKartica
+                        key={p.id}
+                        p={p}
+                        kasni={kasni}
+                        kasniMin={kasni ? minutaKasnjenja(p, sadaTick) : 0}
+                        naNapredujStatus={naNapredujStatus}
+                        naAzurirajVreme={naAzurirajVreme}
+                        mozeMenjatiVreme={mozeMenjatiVreme}
+                        ivica={kolona.ivica}
+                      />
+                    );
+                  })
+                )}
+              </section>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="mt-5 text-center">
         <button
           onClick={naZatvoriDan}
           disabled={zatvaranjeUToku}
-          className="bg-amber-600 disabled:bg-slate-300 text-white font-bold text-sm px-4 py-2.5 rounded-lg shadow-sm hover:bg-amber-700 transition-all"
+          className="bg-transparent border border-novo/40 text-novo font-bold text-xs px-4 py-2.5 rounded-[10px] disabled:opacity-50 hover:bg-novo/10 transition-colors"
           aria-label="Zatvori poslovni dan i arhiviraj porudžbine"
         >
           {zatvaranjeUToku
@@ -152,25 +269,6 @@ export default function KuhinjskaTabla({
             : "Zatvori poslovni dan (Arhiviraj)"}
         </button>
       </div>
-
-      {porudzbine.length === 0 ? (
-        <p className="text-slate-500 text-sm text-center py-8">
-          Trenutno nema aktivnih porudžbina.
-        </p>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {porudzbine.map((p) => (
-            <PorudzbinaKartica
-              key={p.id}
-              p={p}
-              kasni={jeliKasni(p, sadaTick)}
-              naNapredujStatus={naNapredujStatus}
-              naAzurirajVreme={naAzurirajVreme}
-              mozeMenjatiVreme={mozeMenjatiVreme}
-            />
-          ))}
-        </div>
-      )}
     </div>
   );
 }
