@@ -7,18 +7,25 @@ import {
 import { jeliKasni, vremeUMilisekundama } from "../lib/pomocne";
 import { NAZIV_JELA_SR, NAZIV_DODATKA_SR } from "../lib/jelovnik";
 
-// Kolone table. "zavrseno" se namerno NE prikazuje - te porudžbine su predate
-// kuriru i sklanjaju se sa table da ne prave šum; ostaju u bazi do "Zatvori
-// poslovni dan" i vidljive su kroz admin pretragu po kodu.
-const KOLONE = [
-  { status: "novo", boja: "bg-novo", ivica: "border-l-novo" },
-  { status: "u_pripremi", boja: "bg-pripr", ivica: "border-l-pripr" },
-  {
-    status: "spremno_za_dostavu",
-    boja: "bg-spremno",
-    ivica: "border-l-spremno",
+// Porudžbine stoje redom kojim su stigle (hook ih već sortira po
+// vreme_kreiranja rastuće) - bez grupisanja po statusu. Pošto nema kolona
+// koje bi nosile status, svaka kartica ga nosi sama: boja leve ivice +
+// natpis u zaglavlju kartice.
+// Napomena: "zavrseno" se ovde ne pojavljuje jer ga hook i ne dovlači -
+// te porudžbine su predate kuriru i ostaju u bazi do "Zatvori poslovni dan".
+const STIL_STATUSA = {
+  novo: { ivica: "border-l-novo", tacka: "bg-novo", tekst: "text-novo" },
+  u_pripremi: {
+    ivica: "border-l-pripr",
+    tacka: "bg-pripr",
+    tekst: "text-pripr",
   },
-];
+  spremno_za_dostavu: {
+    ivica: "border-l-spremno",
+    tacka: "bg-spremno",
+    tekst: "text-spremno",
+  },
+};
 
 // Koliko minuta porudžbina kasni u odnosu na procenu. Vraća 0 ako ne kasni
 // ili ako vreme nije uneto (kuhinja ga unosi ručno).
@@ -46,8 +53,12 @@ function PorudzbinaKartica({
   naNapredujStatus,
   naAzurirajVreme,
   mozeMenjatiVreme,
-  ivica,
 }) {
+  const stil = STIL_STATUSA[p.status] || {
+    ivica: "border-l-ugalj-vis",
+    tacka: "bg-ugalj-vis",
+    tekst: "text-krem-tih",
+  };
   const [vreme, setVreme] = useState(String(p.trajanje_procena_min || ""));
   const [cuvanjeUToku, setCuvanjeUToku] = useState(false);
 
@@ -60,8 +71,8 @@ function PorudzbinaKartica({
 
   return (
     <article
-      className={`bg-ugalj border border-ugalj-vis rounded-2xl p-3.5 mb-3 border-l-4 ${
-        kasni ? "border-l-kasni border-kasni/40 bg-kasni/[0.07]" : ivica
+      className={`bg-ugalj border border-ugalj-vis rounded-2xl p-3.5 border-l-4 ${
+        kasni ? "border-l-kasni border-kasni/40 bg-kasni/[0.07]" : stil.ivica
       }`}
     >
       <div className="flex justify-between items-baseline mb-3">
@@ -75,6 +86,20 @@ function PorudzbinaKartica({
         </span>
         <span className="font-num text-[11px] font-medium text-krem-tih">
           {satUnosa(p)}
+        </span>
+      </div>
+
+      {/* Status po kartici - nosi ga svaka kartica jer nema kolona po
+          statusu; porudžbine stoje redom kojim su stigle. */}
+      <div className="flex items-center gap-2 mb-3">
+        <span
+          aria-hidden="true"
+          className={`w-2 h-2 rounded-full flex-none ${stil.tacka}`}
+        />
+        <span
+          className={`font-num text-[10px] font-bold tracking-[.13em] uppercase ${stil.tekst}`}
+        >
+          {NAZIV_STATUSA[p.status] || p.status}
         </span>
       </div>
 
@@ -196,62 +221,29 @@ export default function KuhinjskaTabla({
   zatvaranjeUToku,
   mozeMenjatiVreme = false,
 }) {
-  const ukupnoAktivnih = porudzbine.filter((p) =>
-    KOLONE.some((k) => k.status === p.status),
-  ).length;
-
   return (
     <div>
-      {ukupnoAktivnih === 0 ? (
+      {porudzbine.length === 0 ? (
         <p className="text-krem-tih text-sm text-center py-14">
           Trenutno nema aktivnih porudžbina.
         </p>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5 items-start">
-          {KOLONE.map((kolona) => {
-            const uKoloni = porudzbine.filter(
-              (p) => p.status === kolona.status,
-            );
+        // Ravna lista, redom kojim su porudžbine stigle. Na širem ekranu
+        // ide u više kolona da bi sve stale odjednom (tablet na pultu), ali
+        // se i dalje čitaju hronološki - kolone su samo prelom, ne grupe.
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5 items-start">
+          {porudzbine.map((p) => {
+            const kasni = jeliKasni(p, sadaTick);
             return (
-              <section
-                key={kolona.status}
-                className="bg-ugalj/50 border border-ugalj-vis rounded-2xl p-3 min-h-[180px]"
-              >
-                <header className="flex items-center gap-2.5 px-1 pb-3">
-                  <span
-                    aria-hidden="true"
-                    className={`w-2.5 h-2.5 rounded-full flex-none ${kolona.boja}`}
-                  />
-                  <h2 className="flex-1 font-num text-[11px] font-bold tracking-[.14em] uppercase text-krem">
-                    {NAZIV_STATUSA[kolona.status]}
-                  </h2>
-                  <span className="font-num text-xs font-bold bg-ugalj-vis text-krem min-w-6 text-center px-2 py-1 rounded-[7px]">
-                    {uKoloni.length}
-                  </span>
-                </header>
-
-                {uKoloni.length === 0 ? (
-                  <p className="text-center text-krem-tih/50 text-[12.5px] py-7">
-                    —
-                  </p>
-                ) : (
-                  uKoloni.map((p) => {
-                    const kasni = jeliKasni(p, sadaTick);
-                    return (
-                      <PorudzbinaKartica
-                        key={p.id}
-                        p={p}
-                        kasni={kasni}
-                        kasniMin={kasni ? minutaKasnjenja(p, sadaTick) : 0}
-                        naNapredujStatus={naNapredujStatus}
-                        naAzurirajVreme={naAzurirajVreme}
-                        mozeMenjatiVreme={mozeMenjatiVreme}
-                        ivica={kolona.ivica}
-                      />
-                    );
-                  })
-                )}
-              </section>
+              <PorudzbinaKartica
+                key={p.id}
+                p={p}
+                kasni={kasni}
+                kasniMin={kasni ? minutaKasnjenja(p, sadaTick) : 0}
+                naNapredujStatus={naNapredujStatus}
+                naAzurirajVreme={naAzurirajVreme}
+                mozeMenjatiVreme={mozeMenjatiVreme}
+              />
             );
           })}
         </div>
