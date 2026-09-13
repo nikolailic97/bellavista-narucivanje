@@ -42,7 +42,14 @@ const CENA_DOSTAVE = 200;
 const VELIKE_KARTICE_PODKATEGORIJE = ["specijalitet_kuce"];
 const VELIKE_KARTICE_KATEGORIJE = ["preporuceno"];
 
-const REDOSLED_KORAKA = ["novo", "u_pripremi", "spremno_za_dostavu", "zavrseno"];
+// Tri koraka za kupca. "spremno_za_dostavu" je izbačen iz toka (vidi
+// lib/constants.js), ali se i dalje mapira na poslednji korak da bi se
+// porudžbine zatečene u tom statusu prikazale ispravno.
+const REDOSLED_KORAKA = ["novo", "u_pripremi", "zavrseno"];
+function indeksZaStatus(status) {
+  if (status === "spremno_za_dostavu") return REDOSLED_KORAKA.length - 1;
+  return REDOSLED_KORAKA.indexOf(status);
+}
 
 // ---- Da li je porudžbina "istekla" za KUPCA (ne briše se iz baze - osoblje
 // je i dalje vidi do "Zatvori poslovni dan", samo je kupac više ne prati).
@@ -106,15 +113,15 @@ function opisBezPorcije(opis) {
 // porudžbina stigla kad zapravo tek kreće dostava).
 const PREVOD_STATUSA = {
   sr: {
-    novo: "Primljena",
+    novo: "Primljeno",
     u_pripremi: "U pripremi",
-    spremno_za_dostavu: "Spremno za dostavu",
+    spremno_za_dostavu: "Dostava u toku",
     zavrseno: "Dostava u toku",
   },
   en: {
     novo: "Received",
     u_pripremi: "In preparation",
-    spremno_za_dostavu: "Ready for delivery",
+    spremno_za_dostavu: "Out for delivery",
     zavrseno: "Out for delivery",
   },
 };
@@ -124,14 +131,14 @@ const OPIS_KORAKA = {
   sr: {
     novo: "Kuhinja je primila porudžbinu",
     u_pripremi: "Jelo se sprema",
-    spremno_za_dostavu: "Kurir preuzima porudžbinu",
-    zavrseno: "Porudžbina je na putu",
+    spremno_za_dostavu: "Porudžbina je kod kurira",
+    zavrseno: "Porudžbina je kod kurira, stiže uskoro",
   },
   en: {
     novo: "The kitchen received your order",
     u_pripremi: "Your food is being prepared",
-    spremno_za_dostavu: "The courier is picking it up",
-    zavrseno: "Your order is on the way",
+    spremno_za_dostavu: "Your order is with the courier",
+    zavrseno: "Your order is with the courier, arriving soon",
   },
 };
 
@@ -822,21 +829,18 @@ export default function Home() {
 
   const nazivSekcije =
     selektovanaKategorija === "restoran"
-      ? (
-          PODKATEGORIJE_RESTORAN.find(
-            (p) => p.id === selektovanaPodkategorija,
-          ) || {}
-        )[jezik]
+      ? (PODKATEGORIJE_RESTORAN.find(
+          (p) => p.id === selektovanaPodkategorija,
+        ) || {})[jezik]
       : (KATEGORIJE.find((k) => k.id === selektovanaKategorija) || {})[jezik];
 
   const cenaUPanelu = otvorenPanelJelo
-    ? (otvorenPanelJelo.cena +
-        izabraniDodaci.reduce((s, d) => s + d.cena, 0)) *
+    ? (otvorenPanelJelo.cena + izabraniDodaci.reduce((s, d) => s + d.cena, 0)) *
       kolicinaUPanelu
     : 0;
 
   const indeksKoraka = statusPorudzbine
-    ? REDOSLED_KORAKA.indexOf(statusPorudzbine.status)
+    ? indeksZaStatus(statusPorudzbine.status)
     : -1;
 
   return (
@@ -873,16 +877,14 @@ export default function Home() {
       {/* ============ HEADER ============ */}
       <header className="sticky top-0 z-40 bg-noc/92 backdrop-blur-md border-b border-ugalj-vis">
         <div className="max-w-[480px] md:max-w-3xl lg:max-w-5xl mx-auto px-[18px] md:px-6 py-3.5 flex justify-between items-center gap-4">
-          <div className="relative h-8 w-32">
-            <Image
-              src={`${BASE_PATH}/images/logo.svg`}
-              alt={NAZIV_RESTORANA}
-              fill
-              sizes="128px"
-              className="object-contain object-left"
-              priority
-            />
-          </div>
+          <button
+            onClick={() => setAktivniTab("meni")}
+            className="font-display text-xl md:text-[22px] text-krem hover:text-zlato-svetlo transition-colors"
+            aria-label={NAZIV_RESTORANA}
+          >
+            Bella<span className="text-zlato">vista</span>
+          </button>
+
           {/* Desktop navigacija - na mobilnom se koristi donja traka
               (nav.md:hidden na dnu stranice), ovde bi samo trošila prostor. */}
           <nav className="hidden md:flex items-center gap-1 ml-auto mr-2">
@@ -993,126 +995,126 @@ export default function Home() {
                     : "md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-3 md:px-6"
               }
             >
-            {vidljivaJela.length === 0 ? (
-              <p className="text-center text-krem-tih text-sm py-10">—</p>
-            ) : koristiVelikeKartice ? (
-              /* ---- Velike kartice: specijaliteti kuće i combo ponude ---- */
-              vidljivaJela.map((jelo, indeks) => {
-                const porcija = izvuciPorciju(jelo.opis?.[jezik]);
-                const tezina = izvuciTezinu(jelo.naziv[jezik]);
-                return (
-                  <button
-                    key={jelo.id}
-                    onClick={() => otvoriDodatke(jelo)}
-                    className="block w-[calc(100%-36px)] mx-[18px] mb-3.5 md:w-full md:mx-0 md:mb-0 text-left rounded-[18px] overflow-hidden bg-ugalj border border-ugalj-vis hover:border-zlato/40 transition-colors"
-                  >
-                    <div className="relative h-[150px] bg-ugalj-vis">
-                      <Image
-                        src={jelo.slika_url}
-                        alt=""
-                        fill
-                        sizes="(max-width: 480px) 100vw, 480px"
-                        className="object-cover"
-                        priority={indeks === 0}
-                      />
-                      <TrakaNaSlici tagovi={jelo.tagovi} jezik={jezik} />
-                      {tezina && (
-                        <span className="absolute left-3 bottom-3 font-num text-[11px] font-bold tracking-[.06em] bg-noc/85 backdrop-blur-sm text-zlato px-2.5 py-1.5 rounded-md border border-zlato/30">
-                          {tezina}
-                        </span>
-                      )}
-                    </div>
-                    <div className="px-4 pt-[15px] pb-4">
-                      <h3 className="font-display text-[19px] leading-tight mb-2">
-                        {nazivBezTezine(jelo.naziv[jezik])}
-                      </h3>
-                      <div className="mb-2.5">
-                        <MeracPorcije
-                          porcija={porcija}
-                          tezina={null}
-                          jezik={jezik}
+              {vidljivaJela.length === 0 ? (
+                <p className="text-center text-krem-tih text-sm py-10">—</p>
+              ) : koristiVelikeKartice ? (
+                /* ---- Velike kartice: specijaliteti kuće i combo ponude ---- */
+                vidljivaJela.map((jelo, indeks) => {
+                  const porcija = izvuciPorciju(jelo.opis?.[jezik]);
+                  const tezina = izvuciTezinu(jelo.naziv[jezik]);
+                  return (
+                    <button
+                      key={jelo.id}
+                      onClick={() => otvoriDodatke(jelo)}
+                      className="block w-[calc(100%-36px)] mx-[18px] mb-3.5 md:w-full md:mx-0 md:mb-0 text-left rounded-[18px] overflow-hidden bg-ugalj border border-ugalj-vis hover:border-zlato/40 transition-colors"
+                    >
+                      <div className="relative h-[150px] bg-ugalj-vis">
+                        <Image
+                          src={jelo.slika_url}
+                          alt=""
+                          fill
+                          sizes="(max-width: 480px) 100vw, 480px"
+                          className="object-cover"
+                          priority={indeks === 0}
                         />
-                      </div>
-                      <OznakeJela
-                        tagovi={jelo.tagovi}
-                        jezik={jezik}
-                        klasa="mb-2.5"
-                      />
-                      <p className="text-xs leading-relaxed text-krem-tih mb-3.5">
-                        {jelo.sastojci?.[jezik] ||
-                          opisBezPorcije(jelo.opis?.[jezik])}
-                      </p>
-                      <div className="flex justify-between items-center">
-                        <span className="font-num text-[19px] font-bold text-zlato tracking-[-.02em]">
-                          {jelo.cena.toLocaleString("sr-RS")}
-                          <span className="text-[11px] font-medium text-krem-tih ml-1">
-                            RSD
-                          </span>
-                        </span>
-                        <span className="bg-zlato text-noc text-[13px] font-bold px-5 py-2.5 rounded-[10px]">
-                          {t.choose}
-                        </span>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })
-            ) : (
-              /* ---- Kompaktne stavke: sve ostalo ---- */
-              vidljivaJela.map((jelo, indeks) => {
-                const tezina = izvuciTezinu(jelo.naziv[jezik]);
-                return (
-                  <button
-                    key={jelo.id}
-                    onClick={() => otvoriDodatke(jelo)}
-                    className="flex w-[calc(100%-36px)] mx-[18px] gap-3.5 items-center text-left py-3.5 border-b border-ugalj last:border-b-0 md:w-full md:mx-0 md:p-3.5 md:border md:border-ugalj-vis md:rounded-2xl md:hover:border-zlato/40 md:transition-colors"
-                  >
-                    <div className="relative w-16 h-16 flex-none rounded-[11px] overflow-hidden bg-ugalj-vis">
-                      <Image
-                        src={jelo.slika_url}
-                        alt=""
-                        fill
-                        sizes="64px"
-                        className="object-cover"
-                        priority={indeks === 0}
-                      />
-                      <TrakaNaSlici tagovi={jelo.tagovi} jezik={jezik} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-[14.5px] font-semibold mb-0.5">
-                        {nazivBezTezine(jelo.naziv[jezik])}
-                      </h4>
-                      <OznakeJela
-                        tagovi={jelo.tagovi}
-                        jezik={jezik}
-                        klasa="mb-1"
-                      />
-                      <p className="text-[11.5px] leading-snug text-krem-tih line-clamp-2">
-                        {jelo.opis?.[jezik]}
-                      </p>
-                      <div className="flex items-center gap-2.5 mt-[7px]">
-                        <span className="font-num text-sm font-bold text-zlato">
-                          {jelo.cena.toLocaleString("sr-RS")} RSD
-                        </span>
+                        <TrakaNaSlici tagovi={jelo.tagovi} jezik={jezik} />
                         {tezina && (
-                          <span className="font-num text-[10px] font-medium tracking-[.05em] text-krem-tih">
+                          <span className="absolute left-3 bottom-3 font-num text-[11px] font-bold tracking-[.06em] bg-noc/85 backdrop-blur-sm text-zlato px-2.5 py-1.5 rounded-md border border-zlato/30">
                             {tezina}
                           </span>
                         )}
                       </div>
-                    </div>
-                    {/* grid + place-items-center drži "+" tačno u sredini
-                        kvadrata - ranije je line-height gurao znak naniže */}
-                    <span
-                      aria-hidden="true"
-                      className="w-[31px] h-[31px] flex-none grid place-items-center rounded-[9px] bg-ugalj border border-ugalj-vis text-zlato text-lg leading-none"
+                      <div className="px-4 pt-[15px] pb-4">
+                        <h3 className="font-display text-[19px] leading-tight mb-2">
+                          {nazivBezTezine(jelo.naziv[jezik])}
+                        </h3>
+                        <div className="mb-2.5">
+                          <MeracPorcije
+                            porcija={porcija}
+                            tezina={null}
+                            jezik={jezik}
+                          />
+                        </div>
+                        <OznakeJela
+                          tagovi={jelo.tagovi}
+                          jezik={jezik}
+                          klasa="mb-2.5"
+                        />
+                        <p className="text-xs leading-relaxed text-krem-tih mb-3.5">
+                          {jelo.sastojci?.[jezik] ||
+                            opisBezPorcije(jelo.opis?.[jezik])}
+                        </p>
+                        <div className="flex justify-between items-center">
+                          <span className="font-num text-[19px] font-bold text-zlato tracking-[-.02em]">
+                            {jelo.cena.toLocaleString("sr-RS")}
+                            <span className="text-[11px] font-medium text-krem-tih ml-1">
+                              RSD
+                            </span>
+                          </span>
+                          <span className="bg-zlato text-noc text-[13px] font-bold px-5 py-2.5 rounded-[10px]">
+                            {t.choose}
+                          </span>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })
+              ) : (
+                /* ---- Kompaktne stavke: sve ostalo ---- */
+                vidljivaJela.map((jelo, indeks) => {
+                  const tezina = izvuciTezinu(jelo.naziv[jezik]);
+                  return (
+                    <button
+                      key={jelo.id}
+                      onClick={() => otvoriDodatke(jelo)}
+                      className="flex w-[calc(100%-36px)] mx-[18px] gap-3.5 items-center text-left py-3.5 border-b border-ugalj last:border-b-0 md:w-full md:mx-0 md:p-3.5 md:border md:border-ugalj-vis md:rounded-2xl md:hover:border-zlato/40 md:transition-colors"
                     >
-                      +
-                    </span>
-                  </button>
-                );
-              })
-            )}
+                      <div className="relative w-16 h-16 flex-none rounded-[11px] overflow-hidden bg-ugalj-vis">
+                        <Image
+                          src={jelo.slika_url}
+                          alt=""
+                          fill
+                          sizes="64px"
+                          className="object-cover"
+                          priority={indeks === 0}
+                        />
+                        <TrakaNaSlici tagovi={jelo.tagovi} jezik={jezik} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-[14.5px] font-semibold mb-0.5">
+                          {nazivBezTezine(jelo.naziv[jezik])}
+                        </h4>
+                        <OznakeJela
+                          tagovi={jelo.tagovi}
+                          jezik={jezik}
+                          klasa="mb-1"
+                        />
+                        <p className="text-[11.5px] leading-snug text-krem-tih line-clamp-2">
+                          {jelo.opis?.[jezik]}
+                        </p>
+                        <div className="flex items-center gap-2.5 mt-[7px]">
+                          <span className="font-num text-sm font-bold text-zlato">
+                            {jelo.cena.toLocaleString("sr-RS")} RSD
+                          </span>
+                          {tezina && (
+                            <span className="font-num text-[10px] font-medium tracking-[.05em] text-krem-tih">
+                              {tezina}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {/* grid + place-items-center drži "+" tačno u sredini
+                        kvadrata - ranije je line-height gurao znak naniže */}
+                      <span
+                        aria-hidden="true"
+                        className="w-[31px] h-[31px] flex-none grid place-items-center rounded-[9px] bg-ugalj border border-ugalj-vis text-zlato text-lg leading-none"
+                      >
+                        +
+                      </span>
+                    </button>
+                  );
+                })
+              )}
             </div>
 
             <Podnozje t={t} jezik={jezik} />
@@ -1146,160 +1148,166 @@ export default function Home() {
                  na mobilnom ostaje jedna kolona, redom. */
               <div className="lg:grid lg:grid-cols-[1fr_360px] lg:gap-8 lg:px-6 lg:items-start">
                 <div>
-                {korpa.map((stavka) => (
-                  <div
-                    key={stavka.id_stavke}
-                    className="flex gap-3 mx-[18px] lg:mx-0 py-3.5 border-b border-ugalj"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-sm font-semibold mb-0.5">
-                        {nazivBezTezine(stavka.naziv)}
-                      </h4>
-                      {(stavka.dodaci.length > 0 || stavka.napomena) && (
-                        <p className="text-[11px] leading-snug text-krem-tih">
-                          {stavka.dodaci.map((d) => `+ ${d.naziv}`).join(", ")}
-                          {stavka.dodaci.length > 0 && stavka.napomena && " · "}
-                          {stavka.napomena}
-                        </p>
-                      )}
-                      <div className="flex items-center justify-between mt-2">
-                        <div className="flex items-center gap-2.5">
-                          <button
-                            onClick={() =>
-                              promeniKolicinu(stavka.id_stavke, "-")
-                            }
-                            aria-label="−"
-                            className="w-[26px] h-[26px] grid place-items-center rounded-lg bg-ugalj border border-ugalj-vis text-zlato text-[15px] leading-none"
-                          >
-                            −
-                          </button>
-                          <strong className="font-num text-[13px] min-w-4 text-center">
-                            {stavka.kolicina}
-                          </strong>
-                          <button
-                            onClick={() =>
-                              promeniKolicinu(stavka.id_stavke, "+")
-                            }
-                            aria-label="+"
-                            className="w-[26px] h-[26px] grid place-items-center rounded-lg bg-ugalj border border-ugalj-vis text-zlato text-[15px] leading-none"
-                          >
-                            +
-                          </button>
+                  {korpa.map((stavka) => (
+                    <div
+                      key={stavka.id_stavke}
+                      className="flex gap-3 mx-[18px] lg:mx-0 py-3.5 border-b border-ugalj"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-sm font-semibold mb-0.5">
+                          {nazivBezTezine(stavka.naziv)}
+                        </h4>
+                        {(stavka.dodaci.length > 0 || stavka.napomena) && (
+                          <p className="text-[11px] leading-snug text-krem-tih">
+                            {stavka.dodaci
+                              .map((d) => `+ ${d.naziv}`)
+                              .join(", ")}
+                            {stavka.dodaci.length > 0 &&
+                              stavka.napomena &&
+                              " · "}
+                            {stavka.napomena}
+                          </p>
+                        )}
+                        <div className="flex items-center justify-between mt-2">
+                          <div className="flex items-center gap-2.5">
+                            <button
+                              onClick={() =>
+                                promeniKolicinu(stavka.id_stavke, "-")
+                              }
+                              aria-label="−"
+                              className="w-[26px] h-[26px] grid place-items-center rounded-lg bg-ugalj border border-ugalj-vis text-zlato text-[15px] leading-none"
+                            >
+                              −
+                            </button>
+                            <strong className="font-num text-[13px] min-w-4 text-center">
+                              {stavka.kolicina}
+                            </strong>
+                            <button
+                              onClick={() =>
+                                promeniKolicinu(stavka.id_stavke, "+")
+                              }
+                              aria-label="+"
+                              className="w-[26px] h-[26px] grid place-items-center rounded-lg bg-ugalj border border-ugalj-vis text-zlato text-[15px] leading-none"
+                            >
+                              +
+                            </button>
+                          </div>
+                          <span className="font-num text-sm font-bold text-zlato">
+                            {(
+                              stavka.cena_po_komadu * stavka.kolicina
+                            ).toLocaleString("sr-RS")}{" "}
+                            RSD
+                          </span>
                         </div>
-                        <span className="font-num text-sm font-bold text-zlato">
-                          {(
-                            stavka.cena_po_komadu * stavka.kolicina
-                          ).toLocaleString("sr-RS")}{" "}
-                          RSD
-                        </span>
                       </div>
                     </div>
-                  </div>
-                ))}
-
+                  ))}
                 </div>
 
                 <div className="lg:sticky lg:top-24">
-                <div className="m-[18px] lg:mx-0 lg:mt-0 p-4 bg-ugalj rounded-[15px] border border-ugalj-vis">
-                  <div className="flex justify-between text-[13px] text-krem-tih py-1">
-                    <span>{t.subtotal}</span>
-                    <b className="font-num font-medium text-krem">
-                      {cenaStavki.toLocaleString("sr-RS")} RSD
-                    </b>
-                  </div>
-                  <div className="flex justify-between text-[13px] text-krem-tih py-1">
-                    <span>{t.delivery}</span>
-                    <b className="font-num font-medium text-krem">
-                      {trosakDostave.toLocaleString("sr-RS")} RSD
-                    </b>
-                  </div>
-                  <div className="flex justify-between items-center text-[15px] text-krem border-t border-ugalj-vis mt-2 pt-3">
-                    <span>{t.total}</span>
-                    <b className="font-num text-lg font-bold text-zlato">
-                      {ukupnaCena.toLocaleString("sr-RS")} RSD
-                    </b>
-                  </div>
-                </div>
-
-                <form onSubmit={posaljiPorudzbinu}>
-                  <div className="px-[18px] md:px-6 lg:px-0 pt-4 pb-3.5">
-                    <span className="block font-num text-[10px] font-bold tracking-[.16em] uppercase text-zlato mb-1.5">
-                      {t.step} 2 {t.of} 2
-                    </span>
-                    <h2 className="font-display text-[25px] leading-tight tracking-[-.015em]">
-                      {t.deliveryDetails}
-                    </h2>
-                  </div>
-
-                  {[
-                    {
-                      kljuc: "ime",
-                      labela: t.name,
-                      drzac: t.namePlaceholder,
-                      obavezno: true,
-                      tip: "text",
-                      autoComplete: "name",
-                    },
-                    {
-                      kljuc: "telefon",
-                      labela: t.phone,
-                      drzac: t.phonePlaceholder,
-                      obavezno: true,
-                      tip: "tel",
-                      autoComplete: "tel",
-                    },
-                    {
-                      kljuc: "adresa",
-                      labela: t.address,
-                      drzac: t.addressPlaceholder,
-                      obavezno: true,
-                      tip: "text",
-                      autoComplete: "street-address",
-                    },
-                    {
-                      kljuc: "napomena",
-                      labela: `${t.note} — ${t.optional.toLowerCase()}`,
-                      drzac: t.orderNotePlaceholder,
-                      obavezno: false,
-                      tip: "text",
-                      autoComplete: "off",
-                    },
-                  ].map((polje) => (
-                    <div key={polje.kljuc} className="mx-[18px] lg:mx-0 mb-3">
-                      <label
-                        htmlFor={`polje-${polje.kljuc}`}
-                        className="block font-num text-[10px] font-bold tracking-[.13em] uppercase text-krem-tih mb-1.5"
-                      >
-                        {polje.labela}
-                      </label>
-                      <input
-                        id={`polje-${polje.kljuc}`}
-                        type={polje.tip}
-                        required={polje.obavezno}
-                        autoComplete={polje.autoComplete}
-                        value={forma[polje.kljuc]}
-                        onChange={(e) =>
-                          setForma({ ...forma, [polje.kljuc]: e.target.value })
-                        }
-                        placeholder={polje.drzac}
-                        className="w-full bg-ugalj border border-ugalj-vis rounded-[11px] px-3.5 py-3 text-sm text-krem placeholder:text-krem-tih/60 focus:border-zlato focus:outline-none transition-colors"
-                      />
+                  <div className="m-[18px] lg:mx-0 lg:mt-0 p-4 bg-ugalj rounded-[15px] border border-ugalj-vis">
+                    <div className="flex justify-between text-[13px] text-krem-tih py-1">
+                      <span>{t.subtotal}</span>
+                      <b className="font-num font-medium text-krem">
+                        {cenaStavki.toLocaleString("sr-RS")} RSD
+                      </b>
                     </div>
-                  ))}
+                    <div className="flex justify-between text-[13px] text-krem-tih py-1">
+                      <span>{t.delivery}</span>
+                      <b className="font-num font-medium text-krem">
+                        {trosakDostave.toLocaleString("sr-RS")} RSD
+                      </b>
+                    </div>
+                    <div className="flex justify-between items-center text-[15px] text-krem border-t border-ugalj-vis mt-2 pt-3">
+                      <span>{t.total}</span>
+                      <b className="font-num text-lg font-bold text-zlato">
+                        {ukupnaCena.toLocaleString("sr-RS")} RSD
+                      </b>
+                    </div>
+                  </div>
 
-                  <button
-                    type="submit"
-                    disabled={slanjeUToku}
-                    className="mx-[18px] lg:mx-0 mt-5 w-[calc(100%-36px)] lg:w-full bg-zlato text-noc font-bold text-[15px] py-4 rounded-[13px] disabled:opacity-60 hover:bg-zlato-svetlo transition-colors"
-                  >
-                    {slanjeUToku
-                      ? "..."
-                      : `${t.placeOrder} · ${ukupnaCena.toLocaleString("sr-RS")} RSD`}
-                  </button>
-                  <p className="text-center text-[11px] text-krem-tih px-[18px] lg:px-0 pt-3 pb-2">
-                    {t.paymentNote}
-                  </p>
-                </form>
+                  <form onSubmit={posaljiPorudzbinu}>
+                    <div className="px-[18px] md:px-6 lg:px-0 pt-4 pb-3.5">
+                      <span className="block font-num text-[10px] font-bold tracking-[.16em] uppercase text-zlato mb-1.5">
+                        {t.step} 2 {t.of} 2
+                      </span>
+                      <h2 className="font-display text-[25px] leading-tight tracking-[-.015em]">
+                        {t.deliveryDetails}
+                      </h2>
+                    </div>
+
+                    {[
+                      {
+                        kljuc: "ime",
+                        labela: t.name,
+                        drzac: t.namePlaceholder,
+                        obavezno: true,
+                        tip: "text",
+                        autoComplete: "name",
+                      },
+                      {
+                        kljuc: "telefon",
+                        labela: t.phone,
+                        drzac: t.phonePlaceholder,
+                        obavezno: true,
+                        tip: "tel",
+                        autoComplete: "tel",
+                      },
+                      {
+                        kljuc: "adresa",
+                        labela: t.address,
+                        drzac: t.addressPlaceholder,
+                        obavezno: true,
+                        tip: "text",
+                        autoComplete: "street-address",
+                      },
+                      {
+                        kljuc: "napomena",
+                        labela: `${t.note} — ${t.optional.toLowerCase()}`,
+                        drzac: t.orderNotePlaceholder,
+                        obavezno: false,
+                        tip: "text",
+                        autoComplete: "off",
+                      },
+                    ].map((polje) => (
+                      <div key={polje.kljuc} className="mx-[18px] lg:mx-0 mb-3">
+                        <label
+                          htmlFor={`polje-${polje.kljuc}`}
+                          className="block font-num text-[10px] font-bold tracking-[.13em] uppercase text-krem-tih mb-1.5"
+                        >
+                          {polje.labela}
+                        </label>
+                        <input
+                          id={`polje-${polje.kljuc}`}
+                          type={polje.tip}
+                          required={polje.obavezno}
+                          autoComplete={polje.autoComplete}
+                          value={forma[polje.kljuc]}
+                          onChange={(e) =>
+                            setForma({
+                              ...forma,
+                              [polje.kljuc]: e.target.value,
+                            })
+                          }
+                          placeholder={polje.drzac}
+                          className="w-full bg-ugalj border border-ugalj-vis rounded-[11px] px-3.5 py-3 text-sm text-krem placeholder:text-krem-tih/60 focus:border-zlato focus:outline-none transition-colors"
+                        />
+                      </div>
+                    ))}
+
+                    <button
+                      type="submit"
+                      disabled={slanjeUToku}
+                      className="mx-[18px] lg:mx-0 mt-5 w-[calc(100%-36px)] lg:w-full bg-zlato text-noc font-bold text-[15px] py-4 rounded-[13px] disabled:opacity-60 hover:bg-zlato-svetlo transition-colors"
+                    >
+                      {slanjeUToku
+                        ? "..."
+                        : `${t.placeOrder} · ${ukupnaCena.toLocaleString("sr-RS")} RSD`}
+                    </button>
+                    <p className="text-center text-[11px] text-krem-tih px-[18px] lg:px-0 pt-3 pb-2">
+                      {t.paymentNote}
+                    </p>
+                  </form>
                 </div>
               </div>
             )}
@@ -1338,7 +1346,10 @@ export default function Home() {
                     const gotov = i < indeksKoraka;
                     const sad = i === indeksKoraka;
                     return (
-                      <li key={korak} className="flex gap-3.5 relative pb-6 last:pb-0">
+                      <li
+                        key={korak}
+                        className="flex gap-3.5 relative pb-6 last:pb-0"
+                      >
                         {i < REDOSLED_KORAKA.length - 1 && (
                           <span
                             aria-hidden="true"
@@ -1414,14 +1425,17 @@ export default function Home() {
                 {t.haveCode}
               </h3>
             </div>
-            <form onSubmit={hendlajPracenjeKoda} className="flex gap-2.5 mx-[18px] md:mx-6">
+            <form
+              onSubmit={hendlajPracenjeKoda}
+              className="flex gap-2.5 mx-[18px] md:mx-6"
+            >
               <input
                 value={unetiKod}
                 onChange={(e) => setUnetiKod(e.target.value)}
                 placeholder={t.trackCodePlaceholder}
                 inputMode="numeric"
                 aria-label={t.haveCode}
-                className="flex-1 bg-ugalj border border-ugalj-vis rounded-[11px] px-3.5 py-3 font-num text-[15px] font-bold tracking-[.08em] text-krem placeholder:font-medium placeholder:tracking-normal placeholder:text-krem-tih/60 focus:border-zlato focus:outline-none transition-colors"
+                className="polje-kod flex-1 bg-ugalj border border-ugalj-vis rounded-[11px] px-3.5 py-3 font-num text-[15px] font-bold tracking-[.08em] text-krem placeholder:font-medium placeholder:tracking-normal placeholder:text-krem-tih/60 focus:border-zlato focus:outline-none transition-colors"
               />
               <button
                 type="submit"
@@ -1462,10 +1476,7 @@ export default function Home() {
                 sizes="(max-width: 480px) 100vw, 480px"
                 className="object-cover"
               />
-              <TrakaNaSlici
-                tagovi={otvorenPanelJelo.tagovi}
-                jezik={jezik}
-              />
+              <TrakaNaSlici tagovi={otvorenPanelJelo.tagovi} jezik={jezik} />
               <button
                 onClick={() => setOtvorenPanelJelo(null)}
                 aria-label={t.close}
@@ -1504,8 +1515,8 @@ export default function Home() {
                 )}
               </p>
 
-              {(DODACI_PO_KATEGORIJI[otvorenPanelJelo.kategorija] || []).length >
-                0 && (
+              {(DODACI_PO_KATEGORIJI[otvorenPanelJelo.kategorija] || [])
+                .length > 0 && (
                 <div className="border-t border-ugalj-vis pt-4 mb-1.5">
                   <div className="flex justify-between items-baseline mb-2.5">
                     <h5 className="font-num text-[11px] font-bold tracking-[.13em] uppercase text-zlato">
@@ -1576,9 +1587,7 @@ export default function Home() {
 
               <div className="flex items-center justify-center gap-4 mt-4 mb-1.5">
                 <button
-                  onClick={() =>
-                    setKolicinaUPanelu((k) => Math.max(1, k - 1))
-                  }
+                  onClick={() => setKolicinaUPanelu((k) => Math.max(1, k - 1))}
                   aria-label="−"
                   className="w-[38px] h-[38px] grid place-items-center rounded-[11px] bg-noc border border-ugalj-vis text-zlato text-lg leading-none"
                 >

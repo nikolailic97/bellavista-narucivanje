@@ -59,3 +59,28 @@ html {
 .bez-scrollbara::-webkit-scrollbar {
   display: none;
 }
+
+/* ---- Sprečava automatsko zumiranje na iOS Safari-ju pri fokusu na polje.
+   Safari zumira SVAKO polje čiji je font manji od 16px, i posle toga
+   stranica ostaje uvećana - raspored izgleda "polomljeno". Rešenje NIJE
+   maximum-scale=1 u viewport-u (to trajno onemogućava zumiranje prstima i
+   ruši pristupačnost), nego 16px font u samim poljima.
+   Pravilo stoji van @layer-a, pa pobeđuje Tailwind utility klase bez
+   !important. Primenjuje se samo na dodir (pointer: coarse), na desktopu
+   polja zadržavaju sitniji font iz klasa. ---- */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
+/* Broj porudžbine i PIN i dalje treba da budu krupni i razmaknuti - gornje
+   pravilo bi ih spustilo na 16px, pa im vraćamo veličinu. */
+@media (pointer: coarse) {
+  input.polje-kod,
+  input.polje-pin {
+    font-size: 18px;
+  }
+}

@@ -56,7 +56,7 @@ export default function PinPrijava({
           placeholder="PIN kod"
           value={pin}
           onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
-          className="w-full bg-noc border border-ugalj-vis rounded-xl p-3.5 text-center font-num text-xl tracking-[0.4em] font-bold text-krem placeholder:font-body placeholder:text-base placeholder:tracking-normal placeholder:text-krem-tih/60 focus:outline-none focus:border-zlato transition-colors"
+          className="polje-pin w-full bg-noc border border-ugalj-vis rounded-xl p-3.5 text-center font-num text-xl tracking-[0.4em] font-bold text-krem placeholder:font-body placeholder:text-base placeholder:tracking-normal placeholder:text-krem-tih/60 focus:outline-none focus:border-zlato transition-colors"
           aria-label="PIN kod"
           autoComplete="current-password"
         />

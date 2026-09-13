@@ -1,10 +1,10 @@
 import { useState } from "react";
+import { NAZIV_STATUSA, NAZIV_SLEDECE_AKCIJE } from "../lib/constants";
 import {
-  NAZIV_STATUSA,
-  NAZIV_SLEDECE_AKCIJE,
-  BUFFER_KASNJENJA_MIN,
-} from "../lib/constants";
-import { jeliKasni, vremeUMilisekundama } from "../lib/pomocne";
+  jeliKasni,
+  minutaKasnjenja,
+  vremeUMilisekundama,
+} from "../lib/pomocne";
 import { NAZIV_JELA_SR, NAZIV_DODATKA_SR } from "../lib/jelovnik";
 
 // Porudžbine stoje redom kojim su stigle (hook ih već sortira po
@@ -20,22 +20,20 @@ const STIL_STATUSA = {
     tacka: "bg-pripr",
     tekst: "text-pripr",
   },
+  // Finalni korak: kurir je preuzeo porudžbinu. Klikom na ovo kartica
+  // nestaje sa table (hook više ne dovlači taj status).
+  zavrseno: {
+    ivica: "border-l-spremno",
+    tacka: "bg-spremno",
+    tekst: "text-spremno",
+  },
+  // Zastarelo - porudžbine zatečene u ovom statusu iz ranijih verzija.
   spremno_za_dostavu: {
     ivica: "border-l-spremno",
     tacka: "bg-spremno",
     tekst: "text-spremno",
   },
 };
-
-// Koliko minuta porudžbina kasni u odnosu na procenu. Vraća 0 ako ne kasni
-// ili ako vreme nije uneto (kuhinja ga unosi ručno).
-function minutaKasnjenja(p, sadaMs) {
-  const kreiranoMs = vremeUMilisekundama(p.vreme_kreiranja);
-  if (!kreiranoMs || !p.trajanje_procena_min) return 0;
-  const pragMs =
-    kreiranoMs + (p.trajanje_procena_min + BUFFER_KASNJENJA_MIN) * 60000;
-  return Math.max(0, Math.floor((sadaMs - pragMs) / 60000));
-}
 
 function satUnosa(p) {
   const ms = vremeUMilisekundama(p.vreme_kreiranja);

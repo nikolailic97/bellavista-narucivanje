@@ -23,8 +23,14 @@ import {
 } from "recharts";
 import { klaseFontova } from "../lib/fontovi";
 import { db } from "../lib/firebase";
-import { danasnjiDatum, vremeUMilisekundama } from "../lib/pomocne";
-import { NAZIV_STATUSA } from "../lib/constants";
+import {
+  danasnjiDatum,
+  vremeUMilisekundama,
+  jeliKasni,
+  jeZanemarena,
+  minutaKasnjenja,
+} from "../lib/pomocne";
+import { NAZIV_STATUSA, MINUTA_BEZ_VREMENA_PRE_ALARMA } from "../lib/constants";
 import { NAZIV_JELA_SR } from "../lib/jelovnik";
 import { useInternoOsoblje } from "../hooks/useInternoOsoblje";
 import KuhinjskaTabla from "../components/KuhinjskaTabla";
@@ -352,11 +358,16 @@ export default function AdminStranica() {
     juceIzvestaj?.total_orders,
   );
 
-  // ---- Prosečno vreme od porudžbine do predaje kuriru.
+  // ---- Dva RAZLIČITA proseka vremena, često se mešaju:
+  //   STVARNO  = koliko je stvarno prošlo od porudžbine do klika "Dostava u
+  //              toku" (vreme_kreiranja -> vreme_zavrseno). Ovo je istina.
+  //   PLANIRANO = prosek onoga što je osoblje UNELO kao procenu. Ovo je
+  //              obećanje dato kupcu.
+  // Razlika između njih pokazuje koliko su procene realne.
   // VAŽNO: računa se samo iz današnjih ŽIVIH porudžbina - arhivirane se brišu
   // pri "Zatvori poslovni dan" i u izvestaji ostaju samo zbirni brojevi, pa
   // istorijski prosek nije moguć bez izmene tog upisa. ----
-  const prosecnoVremeDostave = (() => {
+  const prosecnoVremeStvarno = (() => {
     const trajanja = zivePorudzbineDanas
       .map((p) => {
         const pocetak = vremeUMilisekundama(p.vreme_kreiranja);
@@ -368,6 +379,42 @@ export default function AdminStranica() {
     if (trajanja.length === 0) return null;
     return Math.round(trajanja.reduce((a, b) => a + b, 0) / trajanja.length);
   })();
+
+  const prosecnoVremePlanirano = (() => {
+    const procene = zivePorudzbineDanas
+      .map((p) => p.trajanje_procena_min)
+      .filter((v) => typeof v === "number" && v > 0);
+    if (procene.length === 0) return null;
+    return Math.round(procene.reduce((a, b) => a + b, 0) / procene.length);
+  })();
+
+  // ---- 5.2: Problematične porudžbine - dve različite vrste:
+  //   ZANEMARENE = osoblje nikad nije unelo procenjeno vreme, a porudžbina
+  //                stoji duže od praga. Signal da niko nije pogledao tablet.
+  //   ZAKASNELE  = vreme je uneto, ali je probijeno.
+  // Računa se iz istih živih porudžbina, bez dodatnih čitanja. ----
+  const problematicne = zivePorudzbineDanas
+    .filter((p) => p.status !== "zavrseno")
+    .map((p) => {
+      if (jeZanemarena(p, sadaTick)) {
+        const kreirano = vremeUMilisekundama(p.vreme_kreiranja);
+        return {
+          ...p,
+          vrsta: "zanemarena",
+          minuta: kreirano ? Math.floor((sadaTick - kreirano) / 60000) : 0,
+        };
+      }
+      if (jeliKasni(p, sadaTick)) {
+        return {
+          ...p,
+          vrsta: "kasni",
+          minuta: minutaKasnjenja(p, sadaTick),
+        };
+      }
+      return null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.minuta - a.minuta);
 
   // ---- Promet po satu (samo "Danas") - pokazuje kad je špic, na osnovu čega
   // se raspoređuju ljudi. Računa se iz istih živih porudžbina, bez dodatnih
@@ -511,7 +558,7 @@ export default function AdminStranica() {
                         setPretragaKod(e.target.value.replace(/\D/g, ""))
                       }
                       placeholder="npr. 48213"
-                      className="flex-1 bg-noc border border-ugalj-vis rounded-[11px] px-3.5 py-3 font-num text-[15px] font-bold tracking-[.08em] text-krem placeholder:font-body placeholder:font-medium placeholder:tracking-normal placeholder:text-krem-tih/60 focus:outline-none focus:border-zlato transition-colors"
+                      className="polje-kod flex-1 bg-noc border border-ugalj-vis rounded-[11px] px-3.5 py-3 font-num text-[15px] font-bold tracking-[.08em] text-krem placeholder:font-body placeholder:font-medium placeholder:tracking-normal placeholder:text-krem-tih/60 focus:outline-none focus:border-zlato transition-colors"
                       aria-label="Broj porudžbine"
                     />
                     <button
@@ -794,16 +841,78 @@ export default function AdminStranica() {
                         napomena="RSD po porudžbini"
                       />
                       <KpiKartica
-                        naslov="Prosečno vreme"
+                        naslov="Stvarno vreme"
                         vrednost={
-                          prosecnoVremeDostave !== null
-                            ? `${prosecnoVremeDostave}`
+                          prosecnoVremeStvarno !== null
+                            ? `${prosecnoVremeStvarno}`
                             : "—"
                         }
-                        jedinica={prosecnoVremeDostave !== null ? "min" : ""}
-                        napomena="od porudžbine do kurira, danas"
+                        jedinica={prosecnoVremeStvarno !== null ? "min" : ""}
+                        napomena="prosek do predaje kuriru, danas"
+                      />
+                      <KpiKartica
+                        naslov="Obećano vreme"
+                        vrednost={
+                          prosecnoVremePlanirano !== null
+                            ? `${prosecnoVremePlanirano}`
+                            : "—"
+                        }
+                        jedinica={prosecnoVremePlanirano !== null ? "min" : ""}
+                        napomena="prosek procena koje unosi kuhinja"
+                      />
+                      <KpiKartica
+                        naslov="Problematične"
+                        vrednost={problematicne.length}
+                        upozorenje={problematicne.length > 0}
+                        napomena="kasne ili bez unetog vremena"
                       />
                     </div>
+
+                    {/* 5.2: Lista problematičnih porudžbina. Prikazuje se samo
+                        kad ih ima, da ne zauzima prostor bez potrebe. */}
+                    {problematicne.length > 0 && (
+                      <Panel
+                        naslov="Zahteva pažnju"
+                        desno={`${problematicne.length} porudžbina`}
+                      >
+                        {problematicne.map((p) => (
+                          <div
+                            key={p.broj}
+                            className="flex items-center gap-3 py-2.5 border-b border-ugalj-vis last:border-b-0"
+                          >
+                            <span className="font-num text-[15px] font-bold text-krem w-14 flex-none">
+                              {p.broj}
+                            </span>
+                            <span className="flex-1 min-w-0">
+                              <span
+                                className={`block text-[13px] font-semibold ${
+                                  p.vrsta === "zanemarena"
+                                    ? "text-novo"
+                                    : "text-kasni"
+                                }`}
+                              >
+                                {p.vrsta === "zanemarena"
+                                  ? "Nije uneto vreme pripreme"
+                                  : `Kasni ${p.minuta} min`}
+                              </span>
+                              <span className="block text-[11px] text-krem-tih mt-0.5">
+                                {p.vrsta === "zanemarena"
+                                  ? `Stoji ${p.minuta} min · prag je ${MINUTA_BEZ_VREMENA_PRE_ALARMA} min`
+                                  : `Procena je bila ${p.trajanje_procena_min} min`}
+                              </span>
+                            </span>
+                            <span className="font-num text-[10px] font-bold tracking-[.1em] uppercase px-2 py-1 rounded-md bg-ugalj-vis text-krem-tih flex-none">
+                              {NAZIV_STATUSA[p.status] || p.status}
+                            </span>
+                          </div>
+                        ))}
+                        <p className="text-[11px] leading-relaxed text-krem-tih/70 mt-3 pt-3 border-t border-ugalj-vis">
+                          Računa se uživo iz današnjih porudžbina. Nestaje kad
+                          kuhinja unese vreme ili označi porudžbinu kao predatu
+                          kuriru.
+                        </p>
+                      </Panel>
+                    )}
 
                     {/* Grafikon: po satu za "Danas", po danu za ostale periode */}
                     {analitikaVreme === "danas" && podaciPoSatu.length > 0 && (
@@ -1016,15 +1125,22 @@ function KpiKartica({
   napomena,
   razlika,
   istaknut,
+  upozorenje,
 }) {
   return (
-    <div className="bg-ugalj border border-ugalj-vis rounded-[15px] px-[17px] py-4">
+    <div
+      className={`rounded-[15px] px-[17px] py-4 border ${
+        upozorenje
+          ? "bg-kasni/[0.08] border-kasni/35"
+          : "bg-ugalj border-ugalj-vis"
+      }`}
+    >
       <span className="block font-num text-[10px] font-bold tracking-[.14em] uppercase text-krem-tih mb-2.5">
         {naslov}
       </span>
       <strong
         className={`block font-num text-[27px] font-bold tracking-[-.02em] leading-none ${
-          istaknut ? "text-zlato" : "text-krem"
+          upozorenje ? "text-kasni" : istaknut ? "text-zlato" : "text-krem"
         }`}
       >
         {vrednost}
