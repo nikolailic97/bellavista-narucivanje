@@ -118,3 +118,10 @@ service cloud.firestore {
 // veličinu svakog polja, što sprečava spam i zloupotrebu kvote, ali ne i
 // nekoga ko namerno pošalje porudžbinu sa manjom cenom. Pošto se plaća
 // pouzećem, osoblje u kuhinji ionako vidi stavke i cenu pre isporuke.
+//
+// TODO (pre pravog lansiranja, kad meni bude finalan): dodati Cloud Function
+// koja presreće kreiranje porudžbine, sama sabira cenu iz lib/jelovnik.js i
+// odbija zahtev ako se ne poklapa sa poslatom cena_ukupno. Zahteva prelazak
+// sa Spark (besplatnog) na Blaze (pay-as-you-go) Firebase plana - odloženo
+// dok se meni ne ustali, da se ne duplira održavanje cenovnika na dva mesta
+// (klijent + rules/Function) dok se stavke još menjaju.
