@@ -1,5 +1,9 @@
+// lozinka=true (admin): obična lozinka, bilo koji znakovi i dužina. Admin
+// nalog vidi prihod i podatke svih kupaca, pa 6 cifara nije dovoljno.
+// Kuhinja ostaje na brzom numeričkom PIN-u (tablet na pultu).
 export default function PinPrijava({
   naslov,
+  lozinka = false,
   email,
   setEmail,
   pin,
@@ -34,7 +38,7 @@ export default function PinPrijava({
         <div>
           <h2 className="font-display text-xl text-krem">{naslov}</h2>
           <p className="text-xs text-krem-tih mt-1.5">
-            Unesi email i PIN kod za pristup
+            Unesi email i {lozinka ? "lozinku" : "PIN kod"} za pristup
           </p>
         </div>
 
@@ -51,13 +55,15 @@ export default function PinPrijava({
 
         <input
           type="password"
-          inputMode="numeric"
-          maxLength={10}
-          placeholder="PIN kod"
+          inputMode={lozinka ? undefined : "numeric"}
+          maxLength={lozinka ? 128 : 10}
+          placeholder={lozinka ? "Lozinka" : "PIN kod"}
           value={pin}
-          onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
+          onChange={(e) =>
+            setPin(lozinka ? e.target.value : e.target.value.replace(/\D/g, ""))
+          }
           className="polje-pin w-full bg-noc border border-ugalj-vis rounded-xl p-3.5 text-center font-num text-xl tracking-[0.4em] font-bold text-krem placeholder:font-body placeholder:text-base placeholder:tracking-normal placeholder:text-krem-tih/60 focus:outline-none focus:border-zlato transition-colors"
-          aria-label="PIN kod"
+          aria-label={lozinka ? "Lozinka" : "PIN kod"}
           autoComplete="current-password"
         />
 

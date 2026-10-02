@@ -11,6 +11,7 @@ import {
   limit,
   startAfter,
   documentId,
+  Timestamp,
 } from "firebase/firestore";
 import {
   BarChart,
@@ -25,13 +26,20 @@ import { klaseFontova } from "../lib/fontovi";
 import { db } from "../lib/firebase";
 import {
   danasnjiDatum,
+  formatirajDatum,
+  pocetakDana,
   vremeUMilisekundama,
   jeliKasni,
   jeZanemarena,
   minutaKasnjenja,
 } from "../lib/pomocne";
 import { NAZIV_STATUSA, MINUTA_BEZ_VREMENA_PRE_ALARMA } from "../lib/constants";
-import { NAZIV_JELA_SR } from "../lib/jelovnik";
+import {
+  NAZIV_JELA_SR,
+  NAZIV_DODATKA_SR,
+  idjeviDodataka,
+  proveriCenu,
+} from "../lib/jelovnik";
 import { useInternoOsoblje } from "../hooks/useInternoOsoblje";
 import KuhinjskaTabla from "../components/KuhinjskaTabla";
 import PinPrijava from "../components/PinPrijava";
@@ -145,10 +153,12 @@ export default function AdminStranica() {
 
   // Žive (još nearhivirane) porudžbine za danas - da se vide odmah, bez
   // čekanja na "Zatvori poslovni dan". Usput čuvamo i sirove dokumente.
+  // "Danas" = od lokalne ponoći po SERVERSKOM vremenu kreiranja, ne po
+  // polju "datum" koje šalje telefon kupca (može imati pogrešan sat).
   const ucitajZivePodatkeZaDanas = async () => {
     const q = query(
       collection(db, "porudzbine"),
-      where("datum", "==", danasnjiDatum()),
+      where("vreme_kreiranja", ">=", Timestamp.fromDate(pocetakDana())),
     );
     const snap = await getDocs(q);
     const dokumenti = snap.docs.map((d) => d.data());
@@ -171,7 +181,7 @@ export default function AdminStranica() {
         // Juče - samo za strelice poređenja. Jedno dodatno čitanje.
         const juce = new Date();
         juce.setDate(juce.getDate() - 1);
-        const juceStr = juce.toISOString().slice(0, 10);
+        const juceStr = formatirajDatum(juce);
         const juceSnap = await getDoc(doc(db, "izvestaji", juceStr));
         setJuceIzvestaj(juceSnap.exists() ? juceSnap.data() : null);
 
@@ -189,7 +199,7 @@ export default function AdminStranica() {
         for (let i = 0; i < brojDana; i++) {
           const d = new Date();
           d.setDate(d.getDate() - i);
-          datumi.push(d.toISOString().slice(0, 10));
+          datumi.push(formatirajDatum(d));
         }
         datumi.reverse(); // hronološki, najstariji prvo
 
@@ -486,6 +496,7 @@ export default function AdminStranica() {
         ) : !imaPristup ? (
           <PinPrijava
             naslov="Admin kontrolna tabla"
+            lozinka
             email={email}
             setEmail={setEmail}
             pin={pin}
@@ -616,11 +627,14 @@ export default function AdminStranica() {
                               {stavka.kolicina}&times;
                             </span>{" "}
                             {NAZIV_JELA_SR[stavka.id_jela] || stavka.naziv}
-                            {stavka.dodaci && stavka.dodaci.length > 0 && (
+                            {idjeviDodataka(stavka).length > 0 && (
                               <span className="text-krem-tih">
                                 {" "}
                                 (+
-                                {stavka.dodaci.map((d) => d.naziv).join(", ")})
+                                {idjeviDodataka(stavka)
+                                  .map((id) => NAZIV_DODATKA_SR[id] || id)
+                                  .join(", ")}
+                                )
                               </span>
                             )}
                           </span>
@@ -644,6 +658,23 @@ export default function AdminStranica() {
                         RSD
                       </span>
                     </div>
+                    {proveriCenu(pretragaRezultat) && (
+                      <p className="mt-3 text-[12px] leading-snug text-[#F3A398] bg-kasni/15 border border-kasni/50 rounded-[9px] px-3 py-2">
+                        {proveriCenu(pretragaRezultat).nepoznato ? (
+                          "⚠ Porudžbina sadrži jelo ili dodatak koji nije u cenovniku."
+                        ) : (
+                          <>
+                            ⚠ Cena ne odgovara cenovniku — po cenovniku:{" "}
+                            <b className="font-num">
+                              {proveriCenu(
+                                pretragaRezultat,
+                              ).ocekivano.toLocaleString("sr-RS")}{" "}
+                              RSD
+                            </b>
+                          </>
+                        )}
+                      </p>
+                    )}
                   </div>
                 )}
 

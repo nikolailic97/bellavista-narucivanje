@@ -84,3 +84,20 @@ html {
     font-size: 18px;
   }
 }
+
+/* Ulazak poruka i potvrda (components/Obavestenja.js) */
+@keyframes iskoci {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [class*="animate-[iskoci"] {
+    animation: none;
+  }
+}

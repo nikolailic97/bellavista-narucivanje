@@ -15,3 +15,5 @@ scripts/service-account-key.json
 # misc
 .DS_Store
 npm-debug.log*
+# Firebase emulator logovi
+*-debug.log

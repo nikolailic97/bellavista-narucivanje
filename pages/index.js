@@ -3,9 +3,8 @@ import Head from "next/head";
 import Image from "next/image";
 import { klaseFontova } from "../lib/fontovi";
 import {
-  collection,
   doc,
-  addDoc,
+  setDoc,
   onSnapshot,
   runTransaction,
   serverTimestamp,
@@ -15,26 +14,36 @@ import {
   danasnjiDatum,
   generisiRandomBroj,
   vremeUMilisekundama,
+  noviIdStavke,
+  jeOtvoreno,
+  danasnjeRadnoVreme,
+  opisRadnogVremena,
 } from "../lib/pomocne";
-import { BASE_PATH } from "../lib/constants";
+import { BASE_PATH, PRAG_BESPLATNE_DOSTAVE } from "../lib/constants";
 import {
   KATEGORIJE,
   JELOVNIK,
   DODACI_PO_KATEGORIJI,
   TAGOVI_INFO,
   PODKATEGORIJE_RESTORAN,
+  dostavaZa,
+  cenaKomadaPoCenovniku,
 } from "../lib/jelovnik";
+import { prikaziPoruku } from "../lib/obavestenja";
 
 // ============ TODO: ZAMENI KAD DOBIJEMO FINALNI NAZIV/LOGO ============
 const NAZIV_RESTORANA = "Restoran"; // koristi se u title/meta/JSON-LD, logo slika ide preko /images/logo.png
 const INSTAGRAM_URL = "https://www.instagram.com/bellavista_restoran/"; // TODO: zameni pravim profilom
 const KONTAKT_TELEFON = "+381 63 1110009"; // TODO: zameni pravim brojem
 const SAJT_ILICODE = "https://nikolailic97.github.io/ilicode-studio/";
-const PRAG_BESPLATNE_DOSTAVE = 1600;
 const MIN_VIDLJIVOSTI_POSLE_ZAVRSETKA = 10; // minuti - koliko dugo kupac vidi/pretražuje gotovu porudžbinu
 const MIN_VIDLJIVOSTI_SPREMNO_ZA_DOSTAVU = 15; // minuti - "sigurnosna mreža": ako osoblje ne klikne "zavrseno", porudžbina ionako nestaje ovoliko posle ulaska u "spremno_za_dostavu"
 const KOD_PRETRAGA_COOLDOWN_MS = 5000; // minimalno vreme između ručnih pretraga po kodu - usporava nagađanje brojeva porudžbine (dodatno uz App Check, vidi lib/firebase.js)
-const CENA_DOSTAVE = 200;
+// Granice iz pravila baze (validneStavke / validnaStavka u firestore.rules)
+const MAKS_STAVKI = 12;
+const MAKS_KOLICINA = 50;
+const KORPA_KLJUC = "korpa_v1";
+const OBAVESTENJA_KLJUC = "obavestenja_porudzbine";
 
 // Kategorije koje se prikazuju kao VELIKE kartice (slika preko cele širine).
 // To su showpiece jela od nekoliko hiljada dinara - ne mogu da izgledaju isto
@@ -80,7 +89,29 @@ function jeIsteklaPorudzbina(podaci) {
 // bedž, a iz naslova sklanjamo - podaci u lib/jelovnik.js ostaju netaknuti.
 // NAPOMENA: kad stigne finalni meni, bolje je uvesti pravo polje `tezina` u
 // jelovnik nego se oslanjati na ovaj regex.
-const REGEX_TEZINA = /\s*(\d+(?:[.,]\d+)?)\s*(kg|g)\b\.?/i;
+// Sistemsko obaveštenje (van stranice). Preko service worker-a kad postoji
+// (jedini način koji radi na Android Chrome-u), inače običan Notification.
+async function prikaziSistemskoObavestenje(naslov, telo) {
+  const opcije = {
+    body: telo,
+    icon: `${BASE_PATH}/images/logo.svg`,
+    tag: "status-porudzbine",
+  };
+  try {
+    const registracija = await navigator.serviceWorker?.getRegistration(
+      `${BASE_PATH}/`,
+    );
+    if (registracija) {
+      await registracija.showNotification(naslov, opcije);
+    } else {
+      new Notification(naslov, opcije);
+    }
+  } catch (greska) {
+    console.error("Obaveštenje nije prikazano:", greska);
+  }
+}
+
+const REGEX_TEZINA =/\s*(\d+(?:[.,]\d+)?)\s*(kg|g)\b\.?/i;
 
 function izvuciTezinu(naziv) {
   const nadjeno = naziv.match(REGEX_TEZINA);
@@ -189,7 +220,8 @@ const PREVODI = {
     reviewTextPlaceholder: "Reci nam više (opciono)",
     reviewSubmit: "Pošalji ocenu",
     reviewThanks: "Hvala na oceni!",
-    reviewAlreadyDone: "Već si nas nedavno ocenio. Hvala!",
+    reviewAlreadyDone: "Već si ocenio ovu porudžbinu. Hvala!",
+    tooManyItems: "Porudžbina može imati najviše 12 različitih stavki. Spoji iste stavke ili pošalji dve porudžbine.",
     people: "OSOBE",
     peopleFew: "OSOBA",
     inProgress: "U toku",
@@ -197,6 +229,20 @@ const PREVODI = {
     of: "od",
     builtBy: "Izradio",
     close: "Zatvori",
+    orderError: "Porudžbina nije poslata. Proveri internet konekciju i pokušaj ponovo.",
+    reviewError: "Ocena nije poslata, pokušaj ponovo.",
+    closedTitle: "Trenutno ne primamo porudžbine",
+    closedText: "Možeš da pogledaš meni i napuniš korpu, a porudžbinu pošalji u radno vreme.",
+    closedToday: "Danas ne radimo.",
+    hours: "Radno vreme",
+    closedBtn: "Zatvoreno",
+    notifyBtn: "Obavesti me kad krene dostava",
+    notifyOn: "Obaveštenja su uključena",
+    notifyOff: "Isključi",
+    notifyBlocked: "Obaveštenja su blokirana u podešavanjima browsera.",
+    notifyUnsupported: "Ovaj browser ne podržava obaveštenja.",
+    notifyHint: "Drži ovu stranicu otvorenu u pozadini da bi obaveštenje stiglo.",
+    statusChanged: "Porudžbina",
   },
   en: {
     cart: "Your cart",
@@ -244,7 +290,8 @@ const PREVODI = {
     reviewTextPlaceholder: "Tell us more (optional)",
     reviewSubmit: "Submit rating",
     reviewThanks: "Thanks for the feedback!",
-    reviewAlreadyDone: "You already rated us recently. Thanks!",
+    reviewAlreadyDone: "You already rated this order. Thanks!",
+    tooManyItems: "An order can have at most 12 different items. Merge identical items or place two orders.",
     people: "PEOPLE",
     peopleFew: "PEOPLE",
     inProgress: "In progress",
@@ -252,6 +299,20 @@ const PREVODI = {
     of: "of",
     builtBy: "Built by",
     close: "Close",
+    orderError: "Your order was not sent. Check your connection and try again.",
+    reviewError: "Your rating was not sent, please try again.",
+    closedTitle: "We're not taking orders right now",
+    closedText: "You can browse the menu and fill your cart, then order during opening hours.",
+    closedToday: "Closed today.",
+    hours: "Opening hours",
+    closedBtn: "Closed",
+    notifyBtn: "Notify me when it's out for delivery",
+    notifyOn: "Notifications are on",
+    notifyOff: "Turn off",
+    notifyBlocked: "Notifications are blocked in your browser settings.",
+    notifyUnsupported: "This browser doesn't support notifications.",
+    notifyHint: "Keep this page open in the background to get the notification.",
+    statusChanged: "Order",
   },
 };
 
@@ -515,12 +576,81 @@ export default function Home() {
   const [slanjeOceneUToku, setSlanjeOceneUToku] = useState(false);
   const [ocenaPoslata, setOcenaPoslata] = useState(false);
 
+  const [otvoreno, setOtvoreno] = useState(true);
+  const [obavestenjaUkljucena, setObavestenjaUkljucena] = useState(false);
+  const [ocenaVecData, setOcenaVecData] = useState(false);
+  const korpaUcitanaRef = useRef(false);
+  const prethodniStatusRef = useRef(null);
+  const jezikRef = useRef(jezik);
+
   const t = PREVODI[jezik];
 
-  // ---- Učitaj sačuvani broj porudžbine ----
   useEffect(() => {
-    const sacuvan = localStorage.getItem("id_porudzbine");
-    if (sacuvan) setAktivniIdPorudzbine(sacuvan);
+    jezikRef.current = jezik;
+  }, [jezik]);
+
+  // ---- Učitaj sačuvani broj porudžbine, korpu i podešavanje obaveštenja ----
+  useEffect(() => {
+    try {
+      const sacuvan = localStorage.getItem("id_porudzbine");
+      if (sacuvan) setAktivniIdPorudzbine(sacuvan);
+
+      // Korpa preživljava osvežavanje stranice. Cena svake stavke se
+      // PONOVO računa po trenutnom cenovniku (ako se meni promenio od
+      // juče), a stavke kojih više nema u meniju se izbacuju.
+      const sacuvanaKorpa = JSON.parse(
+        localStorage.getItem(KORPA_KLJUC) || "[]",
+      );
+      if (Array.isArray(sacuvanaKorpa)) {
+        setKorpa(
+          sacuvanaKorpa
+            .map((stavka) => {
+              const cena = cenaKomadaPoCenovniku(
+                stavka?.id_jela,
+                (stavka?.dodaci || []).map((d) => d.id),
+              );
+              if (cena === null || !(stavka.kolicina > 0)) return null;
+              return { ...stavka, cena_po_komadu: cena };
+            })
+            .filter(Boolean),
+        );
+      }
+
+      if (
+        localStorage.getItem(OBAVESTENJA_KLJUC) === "1" &&
+        "Notification" in window &&
+        Notification.permission === "granted"
+      ) {
+        setObavestenjaUkljucena(true);
+      }
+    } catch (greska) {
+      // Privatni prozor / blokiran storage - aplikacija radi i bez toga
+      console.error("Greška pri čitanju lokalnih podataka:", greska);
+    }
+    korpaUcitanaRef.current = true;
+  }, []);
+
+  // ---- Čuvanje korpe pri svakoj promeni (tek pošto je učitana, inače bi
+  // prazna početna korpa prepisala sačuvanu) ----
+  useEffect(() => {
+    if (!korpaUcitanaRef.current) return;
+    try {
+      if (korpa.length > 0) {
+        localStorage.setItem(KORPA_KLJUC, JSON.stringify(korpa));
+      } else {
+        localStorage.removeItem(KORPA_KLJUC);
+      }
+    } catch {
+      // nije kritično
+    }
+  }, [korpa]);
+
+  // ---- Radno vreme - proverava se na svaki minut ----
+  useEffect(() => {
+    const proveri = () => setOtvoreno(jeOtvoreno());
+    proveri();
+    const interval = setInterval(proveri, 60000);
+    return () => clearInterval(interval);
   }, []);
 
   // ---- Procena preostalog čekanja - lokalno tiktakanje, bez Firestore poziva ----
@@ -554,33 +684,56 @@ export default function Home() {
   // promene statusa, znači ~4 čitanja ukupno, bez obzira koliko puta kupac
   // gleda ekran. Uz to kupac vidi promenu odmah, bez osvežavanja.
   //
-  // Dva uslova da ostane jeftino (oba ispod):
-  //   1) listener radi SAMO dok je "Prati" tab otvoren
-  //   2) odspaja se kad korisnik prebaci tab u browseru / zaključa telefon,
-  //      da otvoren tab preko noći ne drži konekciju bez potrebe
+  // Listener radi dok god kupac ima aktivnu porudžbinu (na bilo kom tabu),
+  // da bi promena statusa "iskočila" i dok gleda meni. Odspaja se kad se
+  // prebaci tab u browseru / zaključa telefon - OSIM ako je kupac uključio
+  // obaveštenja, jer tada baš u pozadini treba da javi "Dostava u toku".
+  // Porudžbina ionako nestaje ~10 min posle završetka, pa listener ne visi.
   // ----
   useEffect(() => {
-    if (!aktivniIdPorudzbine || aktivniTab !== "prati") return;
+    if (!aktivniIdPorudzbine) return;
 
     let odjavi = null;
+    prethodniStatusRef.current = null;
+
+    const objaviPromenu = (status) => {
+      const j = jezikRef.current;
+      const naslov = `${PREVODI[j].statusChanged} ${aktivniIdPorudzbine}: ${
+        PREVOD_STATUSA[j][status] || status
+      }`;
+      const tekst = OPIS_KORAKA[j][status] || "";
+      prikaziPoruku(tekst, {
+        naslov,
+        tip: status === "zavrseno" ? "uspeh" : "info",
+        trajanjeMs: 8000,
+      });
+      if (
+        obavestenjaUkljucena &&
+        document.visibilityState === "hidden" &&
+        (status === "zavrseno" || status === "spremno_za_dostavu")
+      ) {
+        prikaziSistemskoObavestenje(naslov, tekst);
+      }
+    };
 
     const obradiSnimak = (snap) => {
       setOsvezavanjeUToku(false);
-      if (!snap.exists()) {
+      const podaci = snap.exists() ? snap.data() : null;
+      if (!podaci || jeIsteklaPorudzbina(podaci)) {
         setStatusPorudzbine(null);
         setPorudzbinaNijeNadjena(true);
-        localStorage.removeItem("id_porudzbine");
+        try {
+          localStorage.removeItem("id_porudzbine");
+        } catch {
+          // nije kritično
+        }
         return;
       }
-      const podaci = snap.data();
-      if (jeIsteklaPorudzbina(podaci)) {
-        setStatusPorudzbine(null);
-        setPorudzbinaNijeNadjena(true);
-        localStorage.removeItem("id_porudzbine");
-      } else {
-        setStatusPorudzbine(podaci);
-        setPorudzbinaNijeNadjena(false);
-      }
+      const prethodni = prethodniStatusRef.current;
+      prethodniStatusRef.current = podaci.status;
+      if (prethodni && prethodni !== podaci.status) objaviPromenu(podaci.status);
+      setStatusPorudzbine(podaci);
+      setPorudzbinaNijeNadjena(false);
     };
 
     const zakaci = () => {
@@ -604,18 +757,62 @@ export default function Home() {
     };
 
     const naPromenuVidljivosti = () => {
-      if (document.visibilityState === "hidden") otkaci();
-      else zakaci();
+      if (document.visibilityState === "hidden") {
+        if (!obavestenjaUkljucena) otkaci();
+      } else {
+        zakaci();
+      }
     };
 
-    if (document.visibilityState === "visible") zakaci();
+    if (document.visibilityState === "visible" || obavestenjaUkljucena) {
+      zakaci();
+    }
     document.addEventListener("visibilitychange", naPromenuVidljivosti);
 
     return () => {
       document.removeEventListener("visibilitychange", naPromenuVidljivosti);
       otkaci();
     };
-  }, [aktivniIdPorudzbine, aktivniTab]);
+  }, [aktivniIdPorudzbine, obavestenjaUkljucena]);
+
+  // ---- Obaveštenja u browseru (kad porudžbina krene na dostavu) ----
+  const ukljuciObavestenja = async () => {
+    if (!("Notification" in window)) {
+      prikaziPoruku(t.notifyUnsupported, { tip: "greska" });
+      return;
+    }
+    let dozvola = Notification.permission;
+    if (dozvola === "default") dozvola = await Notification.requestPermission();
+    if (dozvola !== "granted") {
+      prikaziPoruku(t.notifyBlocked, { tip: "greska" });
+      return;
+    }
+    // Android Chrome prikazuje obaveštenja samo preko service worker-a
+    // (new Notification() tamo baca grešku) - zato minimalni public/sw.js.
+    try {
+      await navigator.serviceWorker?.register(`${BASE_PATH}/sw.js`, {
+        scope: `${BASE_PATH}/`,
+      });
+    } catch (greska) {
+      console.error("Service worker nije registrovan:", greska);
+    }
+    try {
+      localStorage.setItem(OBAVESTENJA_KLJUC, "1");
+    } catch {
+      // nije kritično
+    }
+    setObavestenjaUkljucena(true);
+    prikaziPoruku(t.notifyHint, { tip: "uspeh", naslov: t.notifyOn });
+  };
+
+  const iskljuciObavestenja = () => {
+    try {
+      localStorage.removeItem(OBAVESTENJA_KLJUC);
+    } catch {
+      // nije kritično
+    }
+    setObavestenjaUkljucena(false);
+  };
 
   // ---- Zaključaj skrol dok je modal otvoren ----
   useEffect(() => {
@@ -631,7 +828,7 @@ export default function Home() {
     0,
   );
   const trosakDostave =
-    cenaStavki > 0 && cenaStavki < PRAG_BESPLATNE_DOSTAVE ? CENA_DOSTAVE : 0;
+    dostavaZa(cenaStavki);
   const ukupnaCena = cenaStavki + trosakDostave;
   const brojStavkiKorpe = korpa.reduce((s, i) => s + i.kolicina, 0);
 
@@ -655,11 +852,10 @@ export default function Home() {
     setKorpa((prev) => [
       ...prev,
       {
-        id_stavke: Date.now().toString(),
+        id_stavke: noviIdStavke(),
         id_jela: otvorenPanelJelo.id,
         naziv: otvorenPanelJelo.naziv[jezik],
         cena_po_komadu: otvorenPanelJelo.cena + cenaDodataka,
-        vreme_pripreme: otvorenPanelJelo.vreme_pripreme,
         napomena: napomenaStavke.trim(),
         dodaci: izabraniDodaci.map((d) => ({
           id: d.id,
@@ -678,7 +874,9 @@ export default function Home() {
         .map((item) => {
           if (item.id_stavke !== id_stavke) return item;
           const novaKolicina =
-            smer === "+" ? item.kolicina + 1 : item.kolicina - 1;
+            smer === "+"
+              ? Math.min(MAKS_KOLICINA, item.kolicina + 1)
+              : item.kolicina - 1;
           return { ...item, kolicina: novaKolicina };
         })
         .filter((item) => item.kolicina > 0),
@@ -689,12 +887,33 @@ export default function Home() {
   const posaljiPorudzbinu = async (e) => {
     e.preventDefault();
     if (korpa.length === 0 || slanjeUToku) return;
+    if (!jeOtvoreno()) {
+      setOtvoreno(false);
+      prikaziPoruku(t.closedText, { tip: "greska", naslov: t.closedTitle });
+      return;
+    }
+    if (korpa.length > MAKS_STAVKI) {
+      prikaziPoruku(t.tooManyItems, { tip: "greska" });
+      return;
+    }
     setSlanjeUToku(true);
     try {
       // Procenjeno vreme se više ne računa automatski (gužva/množilac) - sad
       // ga ručno postavlja kuhinja/admin preko "Sačuvaj vreme", jer bolje znaju
       // stvarnu situaciju u restoranu. Kupac dotad vidi "-" umesto procene.
       let finalniBroj = "";
+
+      // Oblik stavke koji pravila baze dozvoljavaju (vidi validnaStavka u
+      // firestore.rules). Dodaci idu kao "k1,s1" - nazive kuhinja ionako
+      // čita iz cenovnika, na srpskom.
+      const stavkeZaSlanje = korpa.map((s) => ({
+        id_jela: s.id_jela,
+        naziv: String(s.naziv).slice(0, 120),
+        kolicina: s.kolicina,
+        cena_po_komadu: s.cena_po_komadu,
+        napomena: (s.napomena || "").slice(0, 200),
+        dodaci: (s.dodaci || []).map((d) => d.id).join(","),
+      }));
 
       await runTransaction(db, async (tx) => {
         let broj = generisiRandomBroj();
@@ -709,14 +928,15 @@ export default function Home() {
         }
         finalniBroj = broj;
 
-        const porudzbinaRef = doc(collection(db, "porudzbine"));
-        tx.set(porudzbinaRef, {
+        // ID porudžbine = njen broj, isto kao status dokument - pravila baze
+        // tako proveravaju da su oba nastala zajedno (vidi firestore.rules).
+        tx.set(doc(db, "porudzbine", broj), {
           broj,
-          ime: forma.ime,
-          telefon: forma.telefon,
-          adresa: forma.adresa,
-          napomena: forma.napomena || "",
-          stavke: korpa,
+          ime: forma.ime.trim(),
+          telefon: forma.telefon.trim(),
+          adresa: forma.adresa.trim(),
+          napomena: (forma.napomena || "").trim(),
+          stavke: stavkeZaSlanje,
           cena_ukupno: ukupnaCena,
           nacin_placanja: "gotovina",
           status: "novo",
@@ -732,24 +952,29 @@ export default function Home() {
         });
       });
 
-      localStorage.setItem("id_porudzbine", finalniBroj);
+      try {
+        localStorage.setItem("id_porudzbine", finalniBroj);
+      } catch {
+        // nije kritično - broj se i dalje vidi na ekranu
+      }
       setAktivniIdPorudzbine(finalniBroj);
       // Odmah prikaži "Primljena" - znamo da je tako jer smo je upravo
       // kreirali, pa kupac ne gleda prazan ekran dok se listener kači.
       // Realni podaci (sa serverskim vremenom) stižu odmah zatim, prvim
-      // snimkom listener-a koji se kači čim se otvori "Prati" tab ispod.
+      // snimkom listener-a.
       setStatusPorudzbine({
         status: "novo",
         vreme_kreiranja: { toMillis: () => Date.now() },
         trajanje_procena_min: 0,
       });
       setPorudzbinaNijeNadjena(false);
+      setOcenaVecData(false);
       setKorpa([]);
       setForma({ ime: "", telefon: "", adresa: "", napomena: "" });
       setAktivniTab("prati");
     } catch (greska) {
       console.error("Greška prilikom slanja porudžbine:", greska);
-      alert("Došlo je do greške prilikom slanja porudžbine. Pokušaj ponovo.");
+      prikaziPoruku(t.orderError, { tip: "greska" });
     } finally {
       setSlanjeUToku(false);
     }
@@ -769,7 +994,12 @@ export default function Home() {
     setUnetiKod("");
     setStatusPorudzbine(null);
     setPorudzbinaNijeNadjena(false);
-    localStorage.setItem("id_porudzbine", kod);
+    setOcenaVecData(false);
+    try {
+      localStorage.setItem("id_porudzbine", kod);
+    } catch {
+      // nije kritično
+    }
     // Dovoljno je postaviti broj - useEffect iznad automatski kači listener
     // na taj dokument (i skida prethodni, ako ga je bilo).
     setAktivniIdPorudzbine(kod);
@@ -782,34 +1012,50 @@ export default function Home() {
     setModalOcenaOtvoren(true);
   };
 
-  // ---- Recenzija - gost sme samo da kreira, bez čitanja tuđih recenzija.
-  // Interno (lokalno, localStorage) zaključavamo na 24h da sprečimo spam -
-  // ovo NIJE prava bezbednosna brava (neko bi mogao da obriše localStorage),
-  // ali dovoljno je za normalne korisnike, i ne zahteva Cloud Function. ----
-  const POSLEDNJA_OCENA_KLJUC = "poslednja_ocena_vreme";
-  const OCENA_ZAKLJUCAVANJE_MS = 24 * 60 * 60 * 1000; // 24h
+  // ---- Recenzija - jedna po porudžbini. ID recenzije = broj porudžbine, a
+  // pravila baze odbijaju drugu recenziju za isti broj i recenziju za broj
+  // koji ne postoji. localStorage ovde samo pamti da je kupac već ocenio,
+  // da mu ne nudimo formu ponovo - prava zaštita je u pravilima. ----
+  const kljucOcene = (broj) => `ocenjeno_${broj}`;
 
   const jeOcenaZakljucana = () => {
-    const poslednja = localStorage.getItem(POSLEDNJA_OCENA_KLJUC);
-    if (!poslednja) return false;
-    return Date.now() - Number(poslednja) < OCENA_ZAKLJUCAVANJE_MS;
+    if (ocenaVecData) return true;
+    try {
+      return Boolean(localStorage.getItem(kljucOcene(aktivniIdPorudzbine)));
+    } catch {
+      return false;
+    }
+  };
+
+  const zapamtiOcenu = () => {
+    try {
+      localStorage.setItem(kljucOcene(aktivniIdPorudzbine), "1");
+    } catch {
+      // nije kritično
+    }
   };
 
   const posaljiOcenu = async () => {
-    if (izabraneZvezdice < 1 || slanjeOceneUToku) return;
+    if (izabraneZvezdice < 1 || slanjeOceneUToku || !aktivniIdPorudzbine) return;
     setSlanjeOceneUToku(true);
     try {
-      await addDoc(collection(db, "recenzije"), {
+      await setDoc(doc(db, "recenzije", aktivniIdPorudzbine), {
         zvezdice: izabraneZvezdice,
         tekst: tekstOcene.trim(),
         datum: danasnjiDatum(),
         vreme_kreiranja: serverTimestamp(),
       });
-      localStorage.setItem(POSLEDNJA_OCENA_KLJUC, String(Date.now()));
+      zapamtiOcenu();
       setOcenaPoslata(true);
     } catch (greska) {
-      console.error("Greška pri slanju ocene:", greska);
-      alert("Došlo je do greške, pokušaj ponovo.");
+      if (greska?.code === "permission-denied") {
+        // Već postoji ocena za ovu porudžbinu (npr. sa drugog uređaja)
+        zapamtiOcenu();
+        setOcenaVecData(true);
+      } else {
+        console.error("Greška pri slanju ocene:", greska);
+        prikaziPoruku(t.reviewError, { tip: "greska" });
+      }
     } finally {
       setSlanjeOceneUToku(false);
     }
@@ -1067,7 +1313,7 @@ export default function Home() {
                     <button
                       key={jelo.id}
                       onClick={() => otvoriDodatke(jelo)}
-                      className="flex w-[calc(100%-36px)] mx-[18px] gap-3.5 items-center text-left py-3.5 border-b border-ugalj last:border-b-0 md:w-full md:mx-0 md:p-3.5 md:border md:border-ugalj-vis md:rounded-2xl md:hover:border-zlato/40 md:transition-colors"
+                      className="flex w-[calc(100%-36px)] mx-[18px] gap-3.5 items-center text-left py-3.5 border-b border-ugalj max-md:last:border-b-0 md:w-full md:mx-0 md:p-3.5 md:border md:border-ugalj-vis md:rounded-2xl md:hover:border-zlato/40 md:transition-colors"
                     >
                       <div className="relative w-16 h-16 flex-none rounded-[11px] overflow-hidden bg-ugalj-vis">
                         <Image
@@ -1244,6 +1490,7 @@ export default function Home() {
                         obavezno: true,
                         tip: "text",
                         autoComplete: "name",
+                        maks: 100,
                       },
                       {
                         kljuc: "telefon",
@@ -1252,6 +1499,7 @@ export default function Home() {
                         obavezno: true,
                         tip: "tel",
                         autoComplete: "tel",
+                        maks: 30,
                       },
                       {
                         kljuc: "adresa",
@@ -1260,6 +1508,7 @@ export default function Home() {
                         obavezno: true,
                         tip: "text",
                         autoComplete: "street-address",
+                        maks: 200,
                       },
                       {
                         kljuc: "napomena",
@@ -1268,6 +1517,7 @@ export default function Home() {
                         obavezno: false,
                         tip: "text",
                         autoComplete: "off",
+                        maks: 500,
                       },
                     ].map((polje) => (
                       <div key={polje.kljuc} className="mx-[18px] lg:mx-0 mb-3">
@@ -1281,6 +1531,7 @@ export default function Home() {
                           id={`polje-${polje.kljuc}`}
                           type={polje.tip}
                           required={polje.obavezno}
+                          maxLength={polje.maks}
                           autoComplete={polje.autoComplete}
                           value={forma[polje.kljuc]}
                           onChange={(e) =>
@@ -1295,14 +1546,33 @@ export default function Home() {
                       </div>
                     ))}
 
+                    {!otvoreno && (
+                      <div
+                        role="status"
+                        className="mx-[18px] lg:mx-0 mt-5 px-4 py-3.5 rounded-[13px] bg-kasni/10 border border-kasni/40"
+                      >
+                        <p className="text-[13px] font-bold text-krem mb-0.5">
+                          {t.closedTitle}
+                        </p>
+                        <p className="text-[12px] leading-snug text-krem-tih">
+                          {t.closedText}{" "}
+                          {danasnjeRadnoVreme()
+                            ? `${t.hours}: ${danasnjeRadnoVreme()}.`
+                            : t.closedToday}
+                        </p>
+                      </div>
+                    )}
+
                     <button
                       type="submit"
-                      disabled={slanjeUToku}
+                      disabled={slanjeUToku || !otvoreno}
                       className="mx-[18px] lg:mx-0 mt-5 w-[calc(100%-36px)] lg:w-full bg-zlato text-noc font-bold text-[15px] py-4 rounded-[13px] disabled:opacity-60 hover:bg-zlato-svetlo transition-colors"
                     >
                       {slanjeUToku
                         ? "..."
-                        : `${t.placeOrder} · ${ukupnaCena.toLocaleString("sr-RS")} RSD`}
+                        : !otvoreno
+                          ? t.closedBtn
+                          : `${t.placeOrder} · ${ukupnaCena.toLocaleString("sr-RS")} RSD`}
                     </button>
                     <p className="text-center text-[11px] text-krem-tih px-[18px] lg:px-0 pt-3 pb-2">
                       {t.paymentNote}
@@ -1410,6 +1680,28 @@ export default function Home() {
                 >
                   ★ {t.reviewUs}
                 </button>
+
+                {/* Obaveštenje kad krene dostava - nema smisla kad je već krenula */}
+                {indeksKoraka < REDOSLED_KORAKA.length - 1 &&
+                  (obavestenjaUkljucena ? (
+                    <p className="mx-[18px] md:mx-6 mt-3 flex items-center justify-center gap-2 text-[12px] text-krem-tih">
+                      <span aria-hidden="true">🔔</span>
+                      {t.notifyOn}
+                      <button
+                        onClick={iskljuciObavestenja}
+                        className="text-zlato font-semibold underline underline-offset-2"
+                      >
+                        {t.notifyOff}
+                      </button>
+                    </p>
+                  ) : (
+                    <button
+                      onClick={ukljuciObavestenja}
+                      className="mx-[18px] md:mx-6 mt-3 w-[calc(100%-36px)] md:w-[calc(100%-48px)] border border-ugalj-vis text-krem font-bold text-[13px] py-3.5 rounded-xl hover:border-zlato transition-colors"
+                    >
+                      🔔 {t.notifyBtn}
+                    </button>
+                  ))}
               </>
             ) : (
               <p className="mx-[18px] md:mx-6 my-6 px-4 py-6 rounded-[14px] bg-ugalj border border-ugalj-vis text-center text-sm text-krem-tih">
@@ -1577,6 +1869,7 @@ export default function Home() {
                 </div>
                 <textarea
                   rows={2}
+                  maxLength={200}
                   value={napomenaStavke}
                   onChange={(e) => setNapomenaStavke(e.target.value)}
                   placeholder={t.itemNotePlaceholder}
@@ -1597,7 +1890,9 @@ export default function Home() {
                   {kolicinaUPanelu}
                 </strong>
                 <button
-                  onClick={() => setKolicinaUPanelu((k) => k + 1)}
+                  onClick={() =>
+                    setKolicinaUPanelu((k) => Math.min(MAKS_KOLICINA, k + 1))
+                  }
                   aria-label="+"
                   className="w-[38px] h-[38px] grid place-items-center rounded-[11px] bg-noc border border-ugalj-vis text-zlato text-lg leading-none"
                 >
@@ -1762,6 +2057,8 @@ function Podnozje({ t, jezik }) {
         >
           Instagram
         </a>
+        <br />
+        {t.hours}: {opisRadnogVremena(jezik)}
       </p>
       <p className="mt-4 pt-4 border-t border-ugalj font-num text-[10.5px] font-medium tracking-[.06em] text-krem-tih/70">
         {t.builtBy}{" "}

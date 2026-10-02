@@ -5,7 +5,12 @@ import {
   minutaKasnjenja,
   vremeUMilisekundama,
 } from "../lib/pomocne";
-import { NAZIV_JELA_SR, NAZIV_DODATKA_SR } from "../lib/jelovnik";
+import {
+  NAZIV_JELA_SR,
+  NAZIV_DODATKA_SR,
+  idjeviDodataka,
+  proveriCenu,
+} from "../lib/jelovnik";
 
 // Porudžbine stoje redom kojim su stigle (hook ih već sortira po
 // vreme_kreiranja rastuće) - bez grupisanja po statusu. Pošto nema kolona
@@ -59,6 +64,7 @@ function PorudzbinaKartica({
   };
   const [vreme, setVreme] = useState(String(p.trajanje_procena_min || ""));
   const [cuvanjeUToku, setCuvanjeUToku] = useState(false);
+  const greskaCene = proveriCenu(p);
 
   const sacuvajVreme = async () => {
     if (cuvanjeUToku) return;
@@ -113,11 +119,11 @@ function PorudzbinaKartica({
             </span>
             <div className="text-base font-semibold text-krem">
               {NAZIV_JELA_SR[stavka.id_jela] || stavka.naziv}
-              {stavka.dodaci && stavka.dodaci.length > 0 && (
+              {idjeviDodataka(stavka).length > 0 && (
                 <small className="block text-xs font-medium text-krem-tih mt-px">
                   +{" "}
-                  {stavka.dodaci
-                    .map((d) => NAZIV_DODATKA_SR[d.id] || d.naziv)
+                  {idjeviDodataka(stavka)
+                    .map((id) => NAZIV_DODATKA_SR[id] || id)
                     .join(", ")}
                 </small>
               )}
@@ -130,6 +136,43 @@ function PorudzbinaKartica({
           </li>
         ))}
       </ul>
+
+      {/* Cenu šalje browser kupca, pa može biti namerno promenjena - tabla
+          je sama preračunava po cenovniku. Kurir naplaćuje OČEKIVANU cenu. */}
+      {greskaCene && (
+        <div
+          role="alert"
+          className="bg-kasni/15 border border-kasni/50 rounded-[9px] px-3 py-2 text-[12.5px] leading-snug text-[#F3A398] mb-3"
+        >
+          {greskaCene.nepoznato ? (
+            <>
+              <b className="font-bold">⚠ Nepoznata stavka.</b> Porudžbina
+              sadrži jelo ili dodatak koji nije u cenovniku. Proveri cenu pre
+              slanja.
+            </>
+          ) : (
+            <>
+              <b className="font-bold">⚠ Cena ne odgovara cenovniku.</b>{" "}
+              Poslato:{" "}
+              <span className="font-num font-bold">
+                {Number(greskaCene.poslato || 0).toLocaleString("sr-RS")} RSD
+              </span>
+              , po cenovniku:{" "}
+              <span className="font-num font-bold">
+                {greskaCene.ocekivano.toLocaleString("sr-RS")} RSD
+              </span>
+              . Naplati po cenovniku.
+            </>
+          )}
+        </div>
+      )}
+
+      <div className="flex justify-between items-center text-[13px] text-krem-tih mb-3">
+        <span>Za naplatu (gotovina)</span>
+        <span className="font-num font-bold text-zlato">
+          {Number(p.cena_ukupno || 0).toLocaleString("sr-RS")} RSD
+        </span>
+      </div>
 
       {p.napomena && (
         <div className="bg-novo/10 border border-novo/30 rounded-[9px] px-3 py-2 text-[12.5px] leading-snug text-[#F0B267] mb-3">
